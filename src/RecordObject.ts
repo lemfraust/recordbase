@@ -2,6 +2,8 @@ import { RecordField } from "./RecordField";
 import { RecordGroup } from "./RecordGroup";
 import { RecordSchema } from "./RecordSchema";
 
+export type RecordId = string | number;
+
 export type Simplify<T> = { [K in keyof T]: T[K] };
 
 export type RecordGroupObject<Fields extends RecordField<any, any, boolean>[]> = Simplify<{
@@ -31,7 +33,7 @@ export type RecordObject<Schema extends RecordSchema> = Simplify<{
                 ? RecordGroupObject<Fields> | null
                 : never;
 } & {
-    $id?: number;
+    $id?: RecordId;
 }>;
 
 type _RecordNames<Schema extends RecordSchema> = {
