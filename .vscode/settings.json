@@ -1,0 +1,24 @@
+{
+    "files.exclude": {
+        "**/.git": true,
+        "**/.svn": true,
+        "**/.hg": true,
+        "**/.DS_Store": true,
+        "**/Thumbs.db": true,
+        "**/.devcontainer": true,
+        "**/.vscode": true,
+        "**/.gitignore": true,
+        "**/package-lock.json": true,
+        "**/yarn.lock": true,
+        "**/pnpm-lock.yaml": true,
+        "**/bun.lock*": true,
+        "**/tsconfig*.json": true,
+        "**/eslint.config.*": true,
+        "**/.eslintrc*": true,
+        "**/oxlint.config.*": true,
+        "**/.oxlintrc*": true,
+        "**/node_modules": true,
+        "**/dist": true,
+        "**/*.tsbuildinfo": true
+    }
+}
