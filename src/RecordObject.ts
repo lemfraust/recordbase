@@ -36,6 +36,26 @@ export type RecordObject<Schema extends RecordSchema> = Simplify<{
     $id?: RecordId;
 }>;
 
+
+export type RecordGroupPatch<Fields extends RecordField<any, any, boolean>[]> = Simplify<{
+    [Item in Fields[number] as Item['name']]?:
+        Item extends RecordField<any, infer Type, infer Optional>
+            ? Optional extends true ? Type | null : Type
+            : never;
+}>;
+
+export type RecordPatch<Schema extends RecordSchema> = Simplify<{
+    [Item in Schema[number] as Item['name']]?:
+        Item extends RecordField<any, infer Type, infer Optional>
+            ? Optional extends true ? Type | null : Type
+            : Item extends RecordGroup<any, infer Fields, infer Optional>
+                ? Optional extends true ? RecordGroupPatch<Fields> | null : RecordGroupPatch<Fields>
+                : never;
+} & {
+    readonly $id: RecordId;
+}>;
+
+
 type _RecordNames<Schema extends RecordSchema> = {
     [Item in Schema[number] as Item['name']]:
         Item extends RecordField<any, any, any>
