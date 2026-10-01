@@ -1,21 +1,41 @@
-import { RecordId, RecordObject, RecordPatch } from "./RecordObject";
+import { RecordData, RecordEntry, RecordId, RecordPatch } from "./RecordShapes";
 import { RecordSchema } from "./RecordSchema";
 import { RecordTable } from "./RecordTable";
 
-export interface RecordStore {
-    getOne<Schema extends RecordSchema>(table: RecordTable<any, Schema>, id: RecordId): Promise<RecordObject<Schema> | undefined>;
+export type RecordTableData<Table extends RecordTable<any, any>> =
+    Table extends RecordTable<any, infer Schema>
+        ? RecordData<Schema>
+        : never;
 
-    getMany<Schema extends RecordSchema>(table: RecordTable<any, Schema>, ids: RecordId[]): Promise<RecordObject<Schema>[]>;
+export type RecordTableEntry<Table extends RecordTable<any, any>> =
+    Table extends RecordTable<any, infer Schema>
+        ? RecordEntry<Schema>
+        : never;
 
-    getAll<Schema extends RecordSchema>(table: RecordTable<any, Schema>): Promise<RecordObject<Schema>[]>;
+export type RecordTablePatch<Table extends RecordTable<any, any>> =
+    Table extends RecordTable<any, infer Schema>
+        ? RecordPatch<Schema>
+        : never;
+
+export interface RecordStore<Tables extends readonly RecordTable<any, RecordSchema>[]> {
+    readonly tables: Tables;
+
+    count<Table extends Tables[number]>(table: Table): Promise<number>;
 
 
-    addOne<Schema extends RecordSchema>(table: RecordTable<any, Schema>, record: RecordObject<Schema>): Promise<RecordObject<Schema>>;
+    getOne<Table extends Tables[number]>(table: Table, id: RecordId): Promise<RecordTableEntry<Table> | undefined>;
 
-    addMany<Schema extends RecordSchema>(table: RecordTable<any, Schema>, records: RecordObject<Schema>[]): Promise<RecordObject<Schema>[]>;
+    getMany<Table extends Tables[number]>(table: Table, ids: RecordId[]): Promise<RecordTableEntry<Table>[]>;
+
+    getAll<Table extends Tables[number]>(table: Table): Promise<RecordTableEntry<Table>[]>;
 
 
-    updateOne<Schema extends RecordSchema>(table: RecordTable<any, Schema>, patch: RecordPatch<Schema>): Promise<void>;
+    addOne<Table extends Tables[number]>(table: Table, data: RecordTableData<Table>): Promise<RecordTableEntry<Table>>;
 
-    updateMany<Schema extends RecordSchema>(table: RecordTable<any, Schema>, patches: RecordPatch<Schema>[]): Promise<void>;
+    addMany<Table extends Tables[number]>(table: Table, data: RecordTableData<Table>[]): Promise<RecordTableEntry<Table>[]>;
+
+
+    updateOne<Table extends Tables[number]>(table: Table, patch: RecordTablePatch<Table>): Promise<void>;
+
+    updateMany<Table extends Tables[number]>(table: Table, patches: RecordTablePatch<Table>[]): Promise<void>;
 }
