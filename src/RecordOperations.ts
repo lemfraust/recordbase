@@ -65,8 +65,8 @@ export type RecordUpdateReturns = 'id' | 'entry';
 
 export type RecordUpdateOperation<
     Table extends RecordTable<any, any>,
-    Patches extends RecordUpdatePatches<Table> = RecordUpdatePatches<Table>,
-    Returns extends RecordUpdateReturns = 'id'
+    Patches extends RecordUpdatePatches<Table>,
+    Returns extends RecordUpdateReturns
 > = {
     type: 'update';
     table: Table;
@@ -88,7 +88,7 @@ export type RecordUpdateResult<
 
 export type RecordWriteOperation<Table extends RecordTable<any, any>> =
     | RecordAddOperation<Table>
-    | RecordUpdateOperation<Table>;
+    | RecordUpdateOperation<Table, RecordUpdatePatches<Table>, RecordUpdateReturns>;
 
 export type RecordWriteResult<Write extends RecordWriteOperation<any>> =
     Write extends RecordAddOperation<infer Table, infer Data>
