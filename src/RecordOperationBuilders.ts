@@ -26,65 +26,70 @@ export type RecordWriteBuilderResult<Writes extends readonly RecordWriteOperatio
 
 
 // Read
-
 export interface RecordReadable<
     Tables extends readonly RecordTable<any, RecordSchema>[],
     Reads extends readonly RecordReadOperation<Tables[number], any>[] = []
 > {
-    getOne<Table extends Tables[number]>(table: Table, id: RecordId): RecordReadBuilder<Tables, [...Reads, RecordReadOperation<Table, RecordId>]>;
+    getOne<Table extends Tables[number]>(table: Table, id: RecordId): RecordReadBuilder<Tables, readonly [...Reads, RecordReadOperation<Table, RecordId>]>;
 
-    getMany<Table extends Tables[number]>(table: Table, ids: readonly RecordId[]): RecordReadBuilder<Tables, [...Reads, RecordReadOperation<Table, readonly RecordId[]>]>;
+    getMany<Table extends Tables[number]>(table: Table, ids: readonly RecordId[]): RecordReadBuilder<Tables, readonly [...Reads, RecordReadOperation<Table, readonly RecordId[]>]>;
 
-    getAll<Table extends Tables[number]>(table: Table): RecordReadBuilder<Tables, [...Reads, RecordReadOperation<Table, 'all'>]>;
+    getAll<Table extends Tables[number]>(table: Table): RecordReadBuilder<Tables, readonly [...Reads, RecordReadOperation<Table, 'all'>]>;
 
-    count<Table extends Tables[number]>(table: Table): RecordReadBuilder<Tables, [...Reads, RecordReadOperation<Table, 'count'>]>;
+    count<Table extends Tables[number]>(table: Table): RecordReadBuilder<Tables, readonly [...Reads, RecordReadOperation<Table, 'count'>]>;
 }
+
+const freeze = <T>(t: T) => Object.freeze(t);
 
 export class RecordReadBuilder<
     Tables extends readonly RecordTable<any, RecordSchema>[],
     Reads extends readonly RecordReadOperation<Tables[number], any>[]
 > implements RecordReadable<Tables, Reads>, PromiseLike<RecordReadBuilderResult<Reads>> {
-    readonly #reader: RecordReader<Tables>;
-    readonly #reads: Reads;
+    readonly reader: RecordReader<Tables>;
+    readonly reads: Reads;
 
     constructor(reader: RecordReader<Tables>, reads: Reads) {
-        this.#reader = reader;
-        this.#reads = reads;
+        this.reader = reader;
+        this.reads = Object.isFrozen(reads) ? reads : freeze([...reads]) as Reads;
     }
 
-    getOne<Table extends Tables[number]>(table: Table, id: RecordId): RecordReadBuilder<Tables, [...Reads, RecordReadOperation<Table, RecordId>]> {
-        return new RecordReadBuilder(this.#reader, [
-            ...this.#reads,
-            { type: 'read', table, items: id }
-        ] as [...Reads, RecordReadOperation<Table, RecordId>]);
+    getOne<Table extends Tables[number]>(table: Table, id: RecordId): RecordReadBuilder<Tables, readonly [...Reads, RecordReadOperation<Table, RecordId>]> {
+        return new RecordReadBuilder(this.reader, freeze([
+            ...this.reads,
+            freeze({ type: 'read', table, items: id })
+        ]) as readonly [...Reads, RecordReadOperation<Table, RecordId>]);
     }
 
-    getMany<Table extends Tables[number]>(table: Table, ids: readonly RecordId[]): RecordReadBuilder<Tables, [...Reads, RecordReadOperation<Table, readonly RecordId[]>]> {
-        return new RecordReadBuilder(this.#reader, [
-            ...this.#reads,
-            { type: 'read', table, items: ids }
-        ] as [...Reads, RecordReadOperation<Table, readonly RecordId[]>]);
+    getMany<Table extends Tables[number]>(table: Table, ids: readonly RecordId[]): RecordReadBuilder<Tables, readonly [...Reads, RecordReadOperation<Table, readonly RecordId[]>]> {
+        return new RecordReadBuilder(this.reader, freeze([
+            ...this.reads,
+            freeze({ type: 'read', table, items: freeze([...ids]) })
+        ]) as readonly [...Reads, RecordReadOperation<Table, readonly RecordId[]>]);
     }
 
-    getAll<Table extends Tables[number]>(table: Table): RecordReadBuilder<Tables, [...Reads, RecordReadOperation<Table, 'all'>]> {
-        return new RecordReadBuilder(this.#reader, [
-            ...this.#reads,
-            { type: 'read', table, items: 'all' }
-        ] as [...Reads, RecordReadOperation<Table, 'all'>]);
+    getAll<Table extends Tables[number]>(table: Table): RecordReadBuilder<Tables, readonly [...Reads, RecordReadOperation<Table, 'all'>]> {
+        return new RecordReadBuilder(this.reader, freeze([
+            ...this.reads,
+            freeze({ type: 'read', table, items: 'all' })
+        ]) as readonly [...Reads, RecordReadOperation<Table, 'all'>]);
     }
 
-    count<Table extends Tables[number]>(table: Table): RecordReadBuilder<Tables, [...Reads, RecordReadOperation<Table, 'count'>]> {
-        return new RecordReadBuilder(this.#reader, [
-            ...this.#reads,
-            { type: 'read', table, items: 'count' }
-        ] as [...Reads, RecordReadOperation<Table, 'count'>]);
+    count<Table extends Tables[number]>(table: Table): RecordReadBuilder<Tables, readonly [...Reads, RecordReadOperation<Table, 'count'>]> {
+        return new RecordReadBuilder(this.reader, freeze([
+            ...this.reads,
+            freeze({ type: 'read', table, items: 'count' })
+        ]) as readonly [...Reads, RecordReadOperation<Table, 'count'>]);
+    }
+
+    with(reader: RecordReader<Tables>) {
+        return new RecordReadBuilder<Tables, Reads>(reader, this.reads);
     }
 
     then<TResult1 = RecordReadBuilderResult<Reads>, TResult2 = never>(
         onfulfilled?: ((value: RecordReadBuilderResult<Reads>) => TResult1 | PromiseLike<TResult1>) | null,
         onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | null
     ): Promise<TResult1 | TResult2> {
-        return this.#reader.read(this.#reads)
+        return this.reader.read(this.reads)
             .then(results =>
                 (results.length === 1 ? results[0] : results) as RecordReadBuilderResult<Reads>
             )
@@ -99,60 +104,64 @@ export interface RecordWritable<
     Tables extends readonly RecordTable<any, RecordSchema>[],
     Writes extends readonly RecordWriteOperation<Tables[number]>[] = []
 > {
-    addOne<Table extends Tables[number]>(table: Table, data: RecordTableData<Table>): RecordWriteBuilder<Tables, [...Writes, RecordAddOperation<Table, RecordTableData<Table>>]>;
+    addOne<Table extends Tables[number]>(table: Table, data: RecordTableData<Table>): RecordWriteBuilder<Tables, readonly [...Writes, RecordAddOperation<Table, RecordTableData<Table>>]>;
 
-    addMany<Table extends Tables[number]>(table: Table, data: readonly RecordTableData<Table>[]): RecordWriteBuilder<Tables, [...Writes, RecordAddOperation<Table, readonly RecordTableData<Table>[]>]>;
+    addMany<Table extends Tables[number]>(table: Table, data: readonly RecordTableData<Table>[]): RecordWriteBuilder<Tables, readonly [...Writes, RecordAddOperation<Table, readonly RecordTableData<Table>[]>]>;
 
-    updateOne<Table extends Tables[number], Returns extends RecordUpdateReturns = 'id'>(table: Table, patch: RecordTablePatch<Table>, returns?: Returns): RecordWriteBuilder<Tables, [...Writes, RecordUpdateOperation<Table, RecordTablePatch<Table>, Returns>]>;
+    updateOne<Table extends Tables[number], Returns extends RecordUpdateReturns = 'id'>(table: Table, patch: RecordTablePatch<Table>, returns?: Returns): RecordWriteBuilder<Tables, readonly [...Writes, RecordUpdateOperation<Table, RecordTablePatch<Table>, Returns>]>;
 
-    updateMany<Table extends Tables[number], Returns extends RecordUpdateReturns = 'id'>(table: Table, patches: readonly RecordTablePatch<Table>[], returns?: Returns): RecordWriteBuilder<Tables, [...Writes, RecordUpdateOperation<Table, readonly RecordTablePatch<Table>[], Returns>]>;
+    updateMany<Table extends Tables[number], Returns extends RecordUpdateReturns = 'id'>(table: Table, patches: readonly RecordTablePatch<Table>[], returns?: Returns): RecordWriteBuilder<Tables, readonly [...Writes, RecordUpdateOperation<Table, readonly RecordTablePatch<Table>[], Returns>]>;
 }
 
 export class RecordWriteBuilder<
     Tables extends readonly RecordTable<any, RecordSchema>[],
     Writes extends readonly RecordWriteOperation<Tables[number]>[]
 > implements RecordWritable<Tables, Writes>, PromiseLike<RecordWriteBuilderResult<Writes>> {
-    readonly #writer: RecordWriter<Tables>;
-    readonly #writes: Writes;
+    readonly writer: RecordWriter<Tables>;
+    readonly writes: Writes;
 
     constructor(writer: RecordWriter<Tables>, writes: Writes) {
-        this.#writer = writer;
-        this.#writes = writes;
+        this.writer = writer;
+        this.writes = Object.isFrozen(writes) ? writes : freeze([...writes]) as Writes;
     }
 
-    addOne<Table extends Tables[number]>(table: Table, data: RecordTableData<Table>): RecordWriteBuilder<Tables, [...Writes, RecordAddOperation<Table, RecordTableData<Table>>]> {
-        return new RecordWriteBuilder(this.#writer, [
-            ...this.#writes,
-            { type: 'add', table, data }
-        ] as [...Writes, RecordAddOperation<Table, RecordTableData<Table>>]);
+    addOne<Table extends Tables[number]>(table: Table, data: RecordTableData<Table>): RecordWriteBuilder<Tables, readonly [...Writes, RecordAddOperation<Table, RecordTableData<Table>>]> {
+        return new RecordWriteBuilder(this.writer, freeze([
+            ...this.writes,
+            freeze({ type: 'add', table, data })
+        ]) as readonly [...Writes, RecordAddOperation<Table, RecordTableData<Table>>]);
     }
 
-    addMany<Table extends Tables[number]>(table: Table, data: readonly RecordTableData<Table>[]): RecordWriteBuilder<Tables, [...Writes, RecordAddOperation<Table, readonly RecordTableData<Table>[]>]> {
-        return new RecordWriteBuilder(this.#writer, [
-            ...this.#writes,
-            { type: 'add', table, data }
-        ] as [...Writes, RecordAddOperation<Table, readonly RecordTableData<Table>[]>]);
+    addMany<Table extends Tables[number]>(table: Table, data: readonly RecordTableData<Table>[]): RecordWriteBuilder<Tables, readonly [...Writes, RecordAddOperation<Table, readonly RecordTableData<Table>[]>]> {
+        return new RecordWriteBuilder(this.writer, freeze([
+            ...this.writes,
+            freeze({ type: 'add', table, data: freeze([...data]) })
+        ]) as readonly [...Writes, RecordAddOperation<Table, readonly RecordTableData<Table>[]>]);
     }
 
-    updateOne<Table extends Tables[number], Returns extends RecordUpdateReturns = 'id'>(table: Table, patch: RecordTablePatch<Table>, returns: Returns = 'id' as Returns): RecordWriteBuilder<Tables, [...Writes, RecordUpdateOperation<Table, RecordTablePatch<Table>, Returns>]> {
-        return new RecordWriteBuilder(this.#writer, [
-            ...this.#writes,
-            { type: 'update', table, patches: patch, returns }
-        ] as [...Writes, RecordUpdateOperation<Table, RecordTablePatch<Table>, Returns>]);
+    updateOne<Table extends Tables[number], Returns extends RecordUpdateReturns = 'id'>(table: Table, patch: RecordTablePatch<Table>, returns: Returns = 'id' as Returns): RecordWriteBuilder<Tables, readonly [...Writes, RecordUpdateOperation<Table, RecordTablePatch<Table>, Returns>]> {
+        return new RecordWriteBuilder(this.writer, freeze([
+            ...this.writes,
+            freeze({ type: 'update', table, patches: patch, returns })
+        ]) as readonly [...Writes, RecordUpdateOperation<Table, RecordTablePatch<Table>, Returns>]);
     }
 
-    updateMany<Table extends Tables[number], Returns extends RecordUpdateReturns = 'id'>(table: Table, patches: readonly RecordTablePatch<Table>[], returns: Returns = 'id' as Returns): RecordWriteBuilder<Tables, [...Writes, RecordUpdateOperation<Table, readonly RecordTablePatch<Table>[], Returns>]> {
-        return new RecordWriteBuilder(this.#writer, [
-            ...this.#writes,
-            { type: 'update', table, patches, returns }
-        ] as [...Writes, RecordUpdateOperation<Table, readonly RecordTablePatch<Table>[], Returns>]);
+    updateMany<Table extends Tables[number], Returns extends RecordUpdateReturns = 'id'>(table: Table, patches: readonly RecordTablePatch<Table>[], returns: Returns = 'id' as Returns): RecordWriteBuilder<Tables, readonly [...Writes, RecordUpdateOperation<Table, readonly RecordTablePatch<Table>[], Returns>]> {
+        return new RecordWriteBuilder(this.writer, freeze([
+            ...this.writes,
+            freeze({ type: 'update', table, patches: freeze([...patches]), returns })
+        ]) as readonly [...Writes, RecordUpdateOperation<Table, readonly RecordTablePatch<Table>[], Returns>]);
+    }
+
+    with(writer: RecordWriter<Tables>) {
+        return new RecordWriteBuilder<Tables, Writes>(writer, this.writes);
     }
 
     then<TResult1 = RecordWriteBuilderResult<Writes>, TResult2 = never>(
         onfulfilled?: ((value: RecordWriteBuilderResult<Writes>) => TResult1 | PromiseLike<TResult1>) | null,
         onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | null
     ): Promise<TResult1 | TResult2> {
-        return this.#writer.write(this.#writes)
+        return this.writer.write(this.writes)
             .then(results =>
                 (results.length === 1 ? results[0] : results) as RecordWriteBuilderResult<Writes>
             )
