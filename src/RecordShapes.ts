@@ -1,79 +1,80 @@
 import { RecordField } from "./RecordField";
 import { RecordGroup } from "./RecordGroup";
-import { RecordSchema } from "./RecordSchema";
+import { RecordElement, RecordSchema } from "./RecordSchema";
+import { Simplify } from "./util";
 
-export type Simplify<Type> = { [Key in keyof Type]: Type[Key] };
 
 export type RecordId = string | number;
 
 
-export type RecordGroupData<Fields extends RecordField<any, any, boolean>[]> = Simplify<{
-    [Item in Fields[number] as Item['isOptional'] extends false ? Item['name'] : never]:
-        Item extends RecordField<any, infer Type, any>
-            ? Type
+/* Data */
+
+type RecordDataValue<Item extends RecordElement> =
+    Item extends RecordField<any, infer Type, any>
+        ? Type
+        : Item extends RecordGroup<any, infer Fields, any>
+            ? RecordGroupData<Fields>
             : never;
+
+type RecordDataShape<Elements extends readonly RecordElement[]> = {
+    [Item in Elements[number] as Item['isOptional'] extends false ? Item['name'] : never]:
+        RecordDataValue<Item>;
 } & {
-    [Item in Fields[number] as Item['isOptional'] extends true ? Item['name'] : never]?:
-        Item extends RecordField<any, infer Type, any>
-            ? Type | null
+    [Item in Elements[number] as Item['isOptional'] extends true ? Item['name'] : never]?:
+        RecordDataValue<Item> | null;
+};
+
+export type RecordGroupData<Fields extends RecordField<any, any, boolean>[]> =
+    Simplify<RecordDataShape<Fields>>;
+
+export type RecordData<Schema extends RecordSchema> =
+    Simplify<RecordDataShape<Schema>>;
+
+
+/* Partial */
+
+type RecordPartialValue<Item extends RecordElement> =
+    Item extends RecordField<any, infer Type, infer Optional>
+        ? Optional extends true ? Type | null : Type
+        : Item extends RecordGroup<any, infer Fields, infer Optional>
+            ? Optional extends true ? RecordGroupPartial<Fields> | null : RecordGroupPartial<Fields>
             : never;
-}>;
 
-export type RecordData<Schema extends RecordSchema> = Simplify<{
-    [Item in Schema[number] as Item['isOptional'] extends false ? Item['name'] : never]:
-        Item extends RecordField<any, infer Type, any>
-            ? Type
-            : Item extends RecordGroup<any, infer Fields, any>
-                ? RecordGroupData<Fields>
-                : never;
-} & {
-    [Item in Schema[number] as Item['isOptional'] extends true ? Item['name'] : never]?:
-        Item extends RecordField<any, infer Type, any>
-            ? Type | null
-            : Item extends RecordGroup<any, infer Fields, any>
-                ? RecordGroupData<Fields> | null
-                : never;
-}>;
+type RecordPartialShape<Elements extends readonly RecordElement[]> = {
+    [Item in Elements[number] as Item['name']]?:
+        RecordPartialValue<Item>;
+};
+
+export type RecordGroupPartial<Fields extends RecordField<any, any, boolean>[]> =
+    Simplify<RecordPartialShape<Fields>>;
+
+export type RecordPartial<Schema extends RecordSchema> =
+    Simplify<RecordPartialShape<Schema>>;
 
 
-export type RecordGroupPartial<Fields extends RecordField<any, any, boolean>[]> = Simplify<{
-    [Item in Fields[number] as Item['name']]?:
-        Item extends RecordField<any, infer Type, infer Optional>
-            ? Optional extends true ? Type | null : Type
-            : never;
-}>;
-
-export type RecordPartial<Schema extends RecordSchema> = Simplify<{
-    [Item in Schema[number] as Item['name']]?:
-        Item extends RecordField<any, infer Type, infer Optional>
-            ? Optional extends true ? Type | null : Type
-            : Item extends RecordGroup<any, infer Fields, infer Optional>
-                ? Optional extends true ? RecordGroupPartial<Fields> | null : RecordGroupPartial<Fields>
-                : never;
-}>;
-
+/* Stored */
 
 export type RecordEntry<Schema extends RecordSchema> = Simplify<
-    RecordData<Schema> & {
+    RecordDataShape<Schema> & {
         readonly $id: RecordId;
     }
 >;
 
 export type RecordPatch<Schema extends RecordSchema> = Simplify<
-    RecordPartial<Schema> & {
+    RecordPartialShape<Schema> & {
         readonly $id: RecordId;
     }
 >;
 
 
-type _RecordNames<Schema extends RecordSchema> = {
-    [Item in Schema[number] as Item['name']]:
-        Item extends RecordField<any, any, any>
-            ? Item['name']
-            : Item extends RecordGroup<any, infer Fields, any>
-                ? Item['name'] | `${Item['name']}.${_RecordNames<Fields>[keyof _RecordNames<Fields>]}`
-                : never;
-};
+/* Names */
+
+type RecordElementNames<Item extends RecordElement> =
+    Item extends RecordField<infer Name, any, any>
+        ? Name
+        : Item extends RecordGroup<infer Name, infer Fields, any>
+            ? Name | `${Name}.${Fields[number]['name']}`
+            : never;
 
 export type RecordNames<Schema extends RecordSchema> =
-    _RecordNames<Schema>[keyof _RecordNames<Schema>];
+    RecordElementNames<Schema[number]>;

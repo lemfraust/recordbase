@@ -1,10 +1,9 @@
 import { RecordField } from "./RecordField";
 import { RecordGroup } from "./RecordGroup";
 import { RecordSchema } from "./RecordSchema";
+import { Simplify } from "./util";
 
 export type RecordId = string | number;
-
-export type Simplify<T> = { [K in keyof T]: T[K] };
 
 export type RecordGroupObject<Fields extends RecordField<any, any, boolean>[]> = Simplify<{
     [Item in Fields[number] as Item['isOptional'] extends false ? Item['name'] : never]:
