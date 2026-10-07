@@ -100,6 +100,7 @@ export class RecordBook<const Tables extends readonly RecordTable<any, RecordSch
         }
 
         this.#counts.clear();
+        this.#store.invalidate();
     }
 
 

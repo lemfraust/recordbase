@@ -6,4 +6,6 @@ export interface RecordStore<Tables extends readonly RecordTable<any, RecordSche
     extends RecordReader<Tables>, RecordWriter<Tables> {
 
     readonly tables: Tables;
+
+    invalidate(): void;
 }
