@@ -13,14 +13,16 @@ import {
 } from "./RecordOperations";
 import { RecordReader, RecordWriter } from "./RecordOperators";
 import { RecordCache } from "./RecordCache";
-import { RecordSchema } from "./RecordSchema";
+import { RecordElement, RecordSchema } from "./RecordSchema";
 import { RecordEntry, RecordId } from "./RecordShapes";
 import { RecordStore } from "./RecordStore";
 import {
     RecordTable,
     RecordTableData,
+    RecordTableEntry,
     RecordTablePatch
 } from "./RecordTable";
+import { isArray } from "./util";
 
 
 type RecordTableCache<Table extends RecordTable<any, any>> =
@@ -141,7 +143,7 @@ export class RecordBook<const Tables extends readonly RecordTable<any, RecordSch
                 if (result)
                     results[i] = result;
                 else if (cache?.complete)
-                    throw new Error(`Record "${id}" does not exist in table "${read.table.name}"`);
+                    throw new Error(this.#missingCacheRecord(id, read.table.name));
                 else
                     fetch = true;
             }
@@ -154,7 +156,7 @@ export class RecordBook<const Tables extends readonly RecordTable<any, RecordSch
                     if (result)
                         items.push(result);
                     else if (cache?.complete)
-                        throw new Error(`Record "${id}" does not exist in table "${read.table.name}"`);
+                        throw new Error(this.#missingCacheRecord(id, read.table.name));
                     else {
                         fetch = true;
                         break;
@@ -220,25 +222,127 @@ export class RecordBook<const Tables extends readonly RecordTable<any, RecordSch
     }
 
     async write<const Writes extends readonly RecordWriteOperation<Tables[number]>[]>(writes: Writes): Promise<RecordWriteResults<Writes>> {
-        // TODO:
-        //
-        // 1. send writes to #store in their original order
-        // 2. reconcile successful results with attached caches
-        //
-        // add:
-        //     returned entry/entries -> cache.set(...)
-        //
-        // update returning 'entry':
-        //     returned entry/entries -> cache.set(...)
-        //
-        // update returning 'id':
-        //     only update records already present in the cache
-        //     do not fetch cache misses
-        //
-        // patches containing groups must be merged according to
-        // record semantics rather than blindly shallow-spread.
+        const results = await this.#store.write(writes);
 
-        throw new Error('Not implemented');
+        for (let i = 0; i < writes.length; i++) {
+            const write = writes[i];
+            const result = results[i];
+
+            const table = write.table;
+            const cache = this.#caches.get(table);
+
+
+            if (write.type === 'add') {
+                const added = isArray(write.data) ? write.data.length : 1;
+                const count = this.#counts.get(table);
+
+                if (count !== undefined)
+                    this.#counts.set(table, count + added);
+
+                if (cache) {
+                    const complete = cache.complete;
+
+                    if (complete)
+                        cache.complete = false;
+
+                    cache.set(result as any);
+
+                    const count = this.#counts.get(table);
+
+                    if (complete || (count !== undefined && cache.count === count))
+                        cache.complete = true;
+                }
+            }
+            else if (write.returns === 'entry') {
+                if (cache) {
+                    const complete = cache.complete;
+
+                    if (complete)
+                        cache.complete = false;
+
+                    cache.set(result as any);
+
+                    const count = this.#counts.get(table);
+
+                    if (complete || (count !== undefined && cache.count === count))
+                        cache.complete = true;
+                }
+            }
+            else if (cache) {
+                const complete = cache.complete;
+
+                if (complete)
+                    cache.complete = false;
+
+                const patches = isArray(write.patches)
+                    ? write.patches
+                    : [write.patches];
+
+                for (const patch of patches) {
+                    const entry = cache.get(patch.$id);
+
+                    if (!entry) {
+                        if (complete)
+                            throw new Error(this.#missingCacheRecord(patch.$id, table.name));
+
+                        continue;
+                    }
+
+                    cache.set(this.#applyPatch(table, entry as any, patch as any));
+                }
+
+                const count = this.#counts.get(table);
+
+                if (complete || (count !== undefined && cache.count === count))
+                    cache.complete = true;
+            }
+        }
+
+        return results;
+    }
+
+
+
+    #missingCacheRecord(id: RecordId, table: string) {
+        return `Record "${id}" does not exist in complete cache for table "${table}"`;
+    }
+    
+    #applyPatch<Table extends Tables[number]>(
+        table: Table,
+        entry: RecordTableEntry<Table>,
+        patch: RecordTablePatch<Table>
+    ): RecordTableEntry<Table> {
+        const current = entry as Record<string, any>;
+        const changes = patch as Record<string, any>;
+        const result = { ...current };
+
+        for (const element of table.schema) {
+            const value = changes[element.name];
+
+            if (value === undefined)
+                continue;
+
+            if (RecordElement.isGroup(element) && value !== null) {
+                const group = current[element.name];
+                const updated = group && typeof group === 'object'
+                    ? { ...group }
+                    : {};
+
+                for (const field of element.fields) {
+                    const fieldValue = value[field.name];
+
+                    if (fieldValue !== undefined)
+                        updated[field.name] = fieldValue;
+                }
+
+                result[element.name] = updated;
+            }
+            else {
+                result[element.name] = value;
+            }
+        }
+
+        return result as RecordTableEntry<Table>;
     }
 
 
