@@ -2,9 +2,13 @@ import { RecordId } from "./RecordShapes";
 import { RecordTable, RecordTableData, RecordTableEntry, RecordTablePatch } from "./RecordTable";
 
 
-// Read
+/* Read */
 
-export type RecordReadItems = RecordId | readonly RecordId[] | 'all' | 'count';
+export type RecordReadItems =
+    | { id: RecordId; }
+    | { ids: readonly RecordId[]; }
+    | 'all'
+    | 'count';
 
 export type RecordReadOperation<
     Table extends RecordTable<any, any>,
@@ -21,7 +25,7 @@ export type RecordReadResult<
 > =
     Items extends 'count'
         ? number
-        : Items extends 'all' | readonly RecordId[]
+        : Items extends 'all' | {ids: readonly RecordId[] }
             ? RecordTableEntry<Table>[]
             : RecordTableEntry<Table>;
 
@@ -33,7 +37,7 @@ export type RecordReadResults<Reads extends readonly RecordReadOperation<any, an
 };
 
 
-// Add
+/* Add */
 
 export type RecordAddData<Table extends RecordTable<any, any>> =
     RecordTableData<Table> | readonly RecordTableData<Table>[];
@@ -56,7 +60,7 @@ export type RecordAddResult<
         : RecordTableEntry<Table>;
 
 
-// Update
+/* Update */
 
 export type RecordUpdatePatches<Table extends RecordTable<any, any>> =
     RecordTablePatch<Table> | readonly RecordTablePatch<Table>[];
@@ -84,7 +88,7 @@ export type RecordUpdateResult<
         : Patches extends readonly RecordTablePatch<Table>[] ? RecordId[] : RecordId;
 
 
-// Write
+/* Write */
 
 export type RecordWriteOperation<Table extends RecordTable<any, any>> =
     | RecordAddOperation<Table>

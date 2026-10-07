@@ -14,7 +14,7 @@ import {
 import { RecordReader, RecordWriter } from "./RecordOperators";
 import { RecordCache } from "./RecordCache";
 import { RecordSchema } from "./RecordSchema";
-import { RecordId } from "./RecordShapes";
+import { RecordEntry, RecordId } from "./RecordShapes";
 import { RecordStore } from "./RecordStore";
 import {
     RecordTable,
@@ -34,6 +34,8 @@ export class RecordBook<const Tables extends readonly RecordTable<any, RecordSch
 
     readonly #store: RecordStore<Tables>;
     readonly #caches = new Map<RecordTable<any, any>, RecordCache<any>>();
+    readonly #counts = new Map<RecordTable<any, RecordSchema>, number>();
+
 
     #loaders: readonly RecordReadOperation<Tables[number], 'all'>[] | undefined;
 
@@ -79,34 +81,142 @@ export class RecordBook<const Tables extends readonly RecordTable<any, RecordSch
                 if (!cache)
                     throw new Error(`Cache for table "${read.table.name}" no longer exists`);
 
+                cache.complete = false;
                 cache.clear();
                 cache.set(results[i] as any);
+                cache.complete = true;
+                this.#counts.set(read.table, cache.count);
             }
         }
     }
 
     invalidate(): void {
+
         for (const cache of this.#caches.values()) {
+            cache.complete = false;
             cache.clear();
         }
+
+        this.#counts.clear();
     }
 
 
     /* Raw read/write */
     async read<const Reads extends readonly RecordReadOperation<Tables[number]>[]>(reads: Reads): Promise<RecordReadResults<Reads>> {
-        // TODO:
-        //
-        // 1. inspect attached caches
-        // 2. satisfy cache hits
-        // 3. construct reduced store reads for misses
-        // 4. execute those reads through #store
-        // 5. pass fetched entries through their caches
-        // 6. reconstruct results in original read order/cardinality
-        //
-        // getAll may require a store count before deciding whether
-        // the currently cached records represent the complete table.
+        const results = new Array(reads.length);
 
-        throw new Error('Not implemented');
+        const fetchReads: Reads[number][] = [];
+        const fetchIndex: number[] = [];
+
+
+        for (let i = 0; i < reads.length; i++) {
+            const read = reads[i];
+            let fetch = false;
+
+            const cache = this.#caches.get(read.table);
+
+            if (read.items === 'all') {
+                if (cache?.complete)
+                    results[i] = [...cache.records()];
+                else
+                    fetch = true;
+            }
+            else if (read.items === 'count') {
+                const count = this.#counts.get(read.table);
+
+                if (count !== undefined)
+                    results[i] = count;
+                else if (cache?.complete) {
+                    results[i] = cache.count;
+                    this.#counts.set(read.table, cache.count);
+                }
+                else
+                    fetch = true;
+            }
+            else if ('id' in read.items) {
+                const id = read.items.id;
+
+                const result = cache?.get(id);
+
+                if (result)
+                    results[i] = result;
+                else if (cache?.complete)
+                    throw new Error(`Record "${id}" does not exist in table "${read.table.name}"`);
+                else
+                    fetch = true;
+            }
+            else {
+                const items: RecordEntry<any>[] = [];
+
+                for (const id of read.items.ids) {
+                    const result = cache?.get(id);
+
+                    if (result)
+                        items.push(result);
+                    else if (cache?.complete)
+                        throw new Error(`Record "${id}" does not exist in table "${read.table.name}"`);
+                    else {
+                        fetch = true;
+                        break;
+                    }
+                }
+
+                if (!fetch)
+                    results[i] = items;
+            }
+
+            if (fetch) {
+                fetchReads.push(read);
+                fetchIndex.push(i);
+            }
+        }
+
+        if (fetchReads.length) {
+            const fetched = await this.#store.read(fetchReads);
+
+            for (let i = 0; i < fetched.length; i++) {
+                const read = fetchReads[i];
+                const index = fetchIndex[i];
+                results[index] = fetched[i];
+
+                const table = read.table;
+                const cache = this.#caches.get(table);
+
+
+                if (read.items === 'count') {
+                    const count = fetched[i] as number;
+                    this.#counts.set(table, count);
+
+                    if (cache && cache.count === count)
+                        cache.complete = true;
+                }
+                else if (read.items === 'all') {
+                    const records = fetched[i] as RecordEntry<any>[];
+
+                    this.#counts.set(table, records.length);
+
+                    if (cache) {
+                        cache.complete = false;
+                        cache.clear();
+                        cache.set(records);
+                        cache.complete = true;
+                    }
+                }
+                else if (cache) {
+                    const count = this.#counts.get(table);
+
+                    if ('id' in read.items)
+                        cache.set(fetched[i] as RecordEntry<any>);
+                    else
+                        cache.set(fetched[i] as RecordEntry<any>[]);
+
+                    if (count !== undefined && cache.count === count)
+                        cache.complete = true;
+                }
+            }
+        }
+
+        return results as RecordReadResults<Reads>;
     }
 
     async write<const Writes extends readonly RecordWriteOperation<Tables[number]>[]>(writes: Writes): Promise<RecordWriteResults<Writes>> {

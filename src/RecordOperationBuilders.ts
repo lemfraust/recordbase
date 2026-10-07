@@ -30,9 +30,9 @@ export interface RecordReadable<
     Tables extends readonly RecordTable<any, RecordSchema>[],
     Reads extends readonly RecordReadOperation<Tables[number], any>[] = []
 > {
-    getOne<Table extends Tables[number]>(table: Table, id: RecordId): RecordReadBuilder<Tables, readonly [...Reads, RecordReadOperation<Table, RecordId>]>;
+    getOne<Table extends Tables[number]>(table: Table, id: RecordId): RecordReadBuilder<Tables, readonly [...Reads, RecordReadOperation<Table, { id: RecordId; }>]>;
 
-    getMany<Table extends Tables[number]>(table: Table, ids: readonly RecordId[]): RecordReadBuilder<Tables, readonly [...Reads, RecordReadOperation<Table, readonly RecordId[]>]>;
+    getMany<Table extends Tables[number]>(table: Table, ids: readonly RecordId[]): RecordReadBuilder<Tables, readonly [...Reads, RecordReadOperation<Table, { ids: readonly RecordId[]; }>]>;
 
     getAll<Table extends Tables[number]>(table: Table): RecordReadBuilder<Tables, readonly [...Reads, RecordReadOperation<Table, 'all'>]>;
 
@@ -53,18 +53,18 @@ export class RecordReadBuilder<
         this.reads = Object.isFrozen(reads) ? reads : freeze([...reads]) as Reads;
     }
 
-    getOne<Table extends Tables[number]>(table: Table, id: RecordId): RecordReadBuilder<Tables, readonly [...Reads, RecordReadOperation<Table, RecordId>]> {
+    getOne<Table extends Tables[number]>(table: Table, id: RecordId): RecordReadBuilder<Tables, readonly [...Reads, RecordReadOperation<Table, { id: RecordId; }>]> {
         return new RecordReadBuilder(this.reader, freeze([
             ...this.reads,
-            freeze({ type: 'read', table, items: id })
-        ]) as readonly [...Reads, RecordReadOperation<Table, RecordId>]);
+            freeze({ type: 'read', table, items: freeze({ id }) })
+        ]) as readonly [...Reads, RecordReadOperation<Table, { id: RecordId; }>]);
     }
 
-    getMany<Table extends Tables[number]>(table: Table, ids: readonly RecordId[]): RecordReadBuilder<Tables, readonly [...Reads, RecordReadOperation<Table, readonly RecordId[]>]> {
+    getMany<Table extends Tables[number]>(table: Table, ids: readonly RecordId[]): RecordReadBuilder<Tables, readonly [...Reads, RecordReadOperation<Table, { ids: readonly RecordId[]; }>]> {
         return new RecordReadBuilder(this.reader, freeze([
             ...this.reads,
-            freeze({ type: 'read', table, items: freeze([...ids]) })
-        ]) as readonly [...Reads, RecordReadOperation<Table, readonly RecordId[]>]);
+            freeze({ type: 'read', table, items: freeze({ ids: freeze([...ids]) }) })
+        ]) as readonly [...Reads, RecordReadOperation<Table, { ids: readonly RecordId[]; }>]);
     }
 
     getAll<Table extends Tables[number]>(table: Table): RecordReadBuilder<Tables, readonly [...Reads, RecordReadOperation<Table, 'all'>]> {
