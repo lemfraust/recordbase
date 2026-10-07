@@ -49,7 +49,7 @@ export class RecordBook<const Tables extends readonly RecordTable<any, RecordSch
         return this.#store.tables;
     }
 
-
+    
     /* Cache */
     cache<Table extends Tables[number]>(table: Table, cache: RecordTableCache<Table> | null): this {
         if (cache)
@@ -103,6 +103,7 @@ export class RecordBook<const Tables extends readonly RecordTable<any, RecordSch
     }
 
 
+    // TODO: Refactor more
     /* Raw read/write */
     async read<const Reads extends readonly RecordReadOperation<Tables[number]>[]>(reads: Reads): Promise<RecordReadResults<Reads>> {
         const results = new Array(reads.length);
