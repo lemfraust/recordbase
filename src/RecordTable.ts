@@ -15,6 +15,7 @@ export class RecordTable<
     }
 }
 
+export type RecordTableSchema<Table extends RecordTable<string, RecordSchema>> = Table extends RecordTable<string, infer Schema> ? Schema : never;
 
 export type RecordTableData<Table extends RecordTable<any, any>> =
     Table extends RecordTable<any, infer Schema>

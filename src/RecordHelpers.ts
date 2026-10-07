@@ -4,7 +4,12 @@ import { RecordFieldBuilder, RecordGroupBuilder } from "./RecordBuilders";
 import { RecordParser, RecordProcessor } from "./RecordProcessor";
 import { RecordSchema } from "./RecordSchema";
 import { RecordTable } from "./RecordTable";
+import { RecordStore } from "./RecordStore";
+import { RecordBook } from "./RecordBook";
 
+const book = <const Tables extends readonly RecordTable<any, RecordSchema>[]>(
+    store: RecordStore<Tables>
+) => new RecordBook(store);
 
 const table = <const Name extends string, const Schema extends RecordSchema>(name: Name, schema: Schema) =>
     new RecordTable(name, schema);
@@ -158,6 +163,7 @@ const dateField = <const Name extends string>(name: Name, parser?: RecordParser<
 
 
 export {
+    book,
     table,
     group,
     field,

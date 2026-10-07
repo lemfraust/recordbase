@@ -12,7 +12,7 @@ import {
     RecordWriteResults
 } from "./RecordOperations";
 import { RecordReader, RecordWriter } from "./RecordOperators";
-import { RecordCache } from "./RecordCache";
+import { RecordCache, RecordMemoryCache } from "./RecordCache";
 import { RecordElement, RecordSchema } from "./RecordSchema";
 import { RecordEntry, RecordId } from "./RecordShapes";
 import { RecordStore } from "./RecordStore";
@@ -20,16 +20,14 @@ import {
     RecordTable,
     RecordTableData,
     RecordTableEntry,
-    RecordTablePatch
+    RecordTablePatch,
+    RecordTableSchema
 } from "./RecordTable";
 import { isArray } from "./util";
 
+export type RecordCacheConfig = { auto: boolean; };
 
-type RecordTableCache<Table extends RecordTable<any, any>> =
-    Table extends RecordTable<any, infer Schema>
-    ? RecordCache<Schema>
-    : never;
-
+export type RecordCacheFactory<Table extends RecordTable<string, RecordSchema>> = (table: Table) => RecordCache<RecordTableSchema<Table>>;
 
 export class RecordBook<const Tables extends readonly RecordTable<any, RecordSchema>[]>
     implements RecordReader<Tables>, RecordWriter<Tables>, RecordReadable<Tables>, RecordWritable<Tables> {
@@ -49,13 +47,15 @@ export class RecordBook<const Tables extends readonly RecordTable<any, RecordSch
         return this.#store.tables;
     }
 
-    
+
     /* Cache */
-    cache<Table extends Tables[number]>(table: Table, cache: RecordTableCache<Table> | null): this {
-        if (cache)
-            this.#caches.set(table, cache);
-        else
+    cache<Table extends Tables[number]>(table: Table, cache: RecordCacheConfig | RecordCacheFactory<Table> | null): this {
+        if (cache === null)
             this.#caches.delete(table);
+        else if (typeof cache === 'function')
+            this.#caches.set(table, cache(table));
+        else
+            this.#caches.set(table, new RecordMemoryCache<RecordTableSchema<Table>>(cache.auto));
 
         const loaders: RecordReadOperation<Tables[number], 'all'>[] = [];
 
@@ -307,7 +307,7 @@ export class RecordBook<const Tables extends readonly RecordTable<any, RecordSch
     #missingCacheRecord(id: RecordId, table: string) {
         return `Record "${id}" does not exist in complete cache for table "${table}"`;
     }
-    
+
     #applyPatch<Table extends Tables[number]>(
         table: Table,
         entry: RecordTableEntry<Table>,
