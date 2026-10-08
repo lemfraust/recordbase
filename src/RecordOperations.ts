@@ -4,13 +4,13 @@ import { RecordTable, RecordTableData, RecordTableEntry, RecordTablePatch } from
 
 /* Read */
 export type RecordReadItems =
-    | { id: RecordId; }
-    | { ids: readonly RecordId[]; }
+    | 'count'
     | 'all'
-    | 'count';
+    | { id: RecordId; }
+    | { ids: readonly RecordId[]; };
 
 export type RecordReadOperation<
-    Table extends RecordTable<any, any>,
+    Table extends RecordTable = RecordTable,
     Items extends RecordReadItems = RecordReadItems
 > = {
     type: 'read';
@@ -19,16 +19,16 @@ export type RecordReadOperation<
 };
 
 export type RecordReadResult<
-    Table extends RecordTable<any, any>,
+    Table extends RecordTable,
     Items extends RecordReadItems
 > =
     Items extends 'count'
         ? number
-        : Items extends 'all' | {ids: readonly RecordId[] }
+        : Items extends 'all' | { ids: readonly RecordId[]; }
             ? RecordTableEntry<Table>[]
             : RecordTableEntry<Table>;
 
-export type RecordReadResults<Reads extends readonly RecordReadOperation<any, any>[]> = {
+export type RecordReadResults<Reads extends readonly RecordReadOperation[]> = {
     [Index in keyof Reads]:
         Reads[Index] extends RecordReadOperation<infer Table, infer Items>
             ? RecordReadResult<Table, Items>
@@ -37,11 +37,12 @@ export type RecordReadResults<Reads extends readonly RecordReadOperation<any, an
 
 
 /* Add */
-export type RecordAddData<Table extends RecordTable<any, any>> =
-    RecordTableData<Table> | readonly RecordTableData<Table>[];
+export type RecordAddData<Table extends RecordTable> =
+    | RecordTableData<Table>
+    | readonly RecordTableData<Table>[];
 
 export type RecordAddOperation<
-    Table extends RecordTable<any, any>,
+    Table extends RecordTable = RecordTable,
     Data extends RecordAddData<Table> = RecordAddData<Table>
 > = {
     type: 'add';
@@ -50,7 +51,7 @@ export type RecordAddOperation<
 };
 
 export type RecordAddResult<
-    Table extends RecordTable<any, any>,
+    Table extends RecordTable,
     Data extends RecordAddData<Table>
 > =
     Data extends readonly RecordTableData<Table>[]
@@ -59,15 +60,16 @@ export type RecordAddResult<
 
 
 /* Update */
-export type RecordUpdatePatches<Table extends RecordTable<any, any>> =
-    RecordTablePatch<Table> | readonly RecordTablePatch<Table>[];
+export type RecordUpdatePatches<Table extends RecordTable> =
+    | RecordTablePatch<Table>
+    | readonly RecordTablePatch<Table>[];
 
 export type RecordUpdateReturns = 'id' | 'entry';
 
 export type RecordUpdateOperation<
-    Table extends RecordTable<any, any>,
-    Patches extends RecordUpdatePatches<Table>,
-    Returns extends RecordUpdateReturns
+    Table extends RecordTable = RecordTable,
+    Patches extends RecordUpdatePatches<Table> = RecordUpdatePatches<Table>,
+    Returns extends RecordUpdateReturns = RecordUpdateReturns
 > = {
     type: 'update';
     table: Table;
@@ -76,7 +78,7 @@ export type RecordUpdateOperation<
 };
 
 export type RecordUpdateResult<
-    Table extends RecordTable<any, any>,
+    Table extends RecordTable,
     Patches extends RecordUpdatePatches<Table>,
     Returns extends RecordUpdateReturns
 > =
@@ -86,20 +88,20 @@ export type RecordUpdateResult<
 
 
 /* Write */
-export type RecordWriteOperation<Table extends RecordTable<any, any>> =
+export type RecordWriteOperation<Table extends RecordTable = RecordTable> =
     | RecordAddOperation<Table>
-    | RecordUpdateOperation<Table, RecordUpdatePatches<Table>, RecordUpdateReturns>;
+    | RecordUpdateOperation<Table>;
 
-export type RecordWriteResult<Write extends RecordWriteOperation<any>> =
+export type RecordWriteResult<Write extends RecordWriteOperation> =
     Write extends RecordAddOperation<infer Table, infer Data>
         ? RecordAddResult<Table, Data>
         : Write extends RecordUpdateOperation<infer Table, infer Patches, infer Returns>
             ? RecordUpdateResult<Table, Patches, Returns>
             : never;
 
-export type RecordWriteResults<Writes extends readonly RecordWriteOperation<any>[]> = {
+export type RecordWriteResults<Writes extends readonly RecordWriteOperation[]> = {
     [Index in keyof Writes]:
-        Writes[Index] extends RecordWriteOperation<any>
+        Writes[Index] extends RecordWriteOperation
             ? RecordWriteResult<Writes[Index]>
             : never;
 };

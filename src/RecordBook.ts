@@ -1,7 +1,7 @@
-import { RecordReadable, RecordReadBuilder, RecordWritable, RecordWriteBuilder } from "./RecordOperationBuilders";
-import { RecordReadOperation, RecordReadResults, RecordUpdateReturns, RecordWriteOperation, RecordWriteResults } from "./RecordOperations";
+import { RecordReadable, RecordReadBuilder, RecordWritable, RecordWritableExecutable, RecordWriteBuilder } from "./RecordOperationBuilders";
+import { RecordReadOperation, RecordReadResults, RecordUpdateResult, RecordUpdateReturns, RecordWriteOperation, RecordWriteResults } from "./RecordOperations";
 import { RecordCache, RecordMemoryCache } from "./RecordCache";
-import { RecordElement, RecordSchema } from "./RecordSchema";
+import { RecordElement } from "./RecordSchema";
 import { RecordEntry, RecordId } from "./RecordShapes";
 import { RecordReader, RecordStore, RecordWriter } from "./RecordStore";
 import { RecordTable, RecordTableData, RecordTableEntry, RecordTablePatch, RecordTableSchema } from "./RecordTable";
@@ -9,14 +9,14 @@ import { isArray } from "./util";
 
 export type RecordCacheConfig = { auto: boolean; };
 
-export type RecordCacheFactory<Table extends RecordTable<string, RecordSchema>> = (table: Table) => RecordCache<RecordTableSchema<Table>>;
+export type RecordCacheFactory<Table extends RecordTable> = (table: Table) => RecordCache<RecordTableSchema<Table>>;
 
-export class RecordBook<const Tables extends readonly RecordTable<any, RecordSchema>[]>
+export class RecordBook<const Tables extends readonly RecordTable[]>
     implements RecordReader<Tables>, RecordWriter<Tables>, RecordReadable<Tables>, RecordWritable<Tables> {
 
     readonly #store: RecordStore<Tables>;
-    readonly #caches = new Map<RecordTable<any, any>, RecordCache<any>>();
-    readonly #counts = new Map<RecordTable<any, RecordSchema>, number>();
+    readonly #caches = new Map<RecordTable, RecordCache>();
+    readonly #counts = new Map<RecordTable, number>();
 
 
     #loaders: readonly RecordReadOperation<Tables[number], 'all'>[] | undefined;
@@ -367,11 +367,17 @@ export class RecordBook<const Tables extends readonly RecordTable<any, RecordSch
         return this.writer().addMany(table, data);
     }
 
-    updateOne<Table extends Tables[number], Returns extends RecordUpdateReturns = 'id'>(table: Table, patch: RecordTablePatch<Table>, returns?: Returns) {
+    updateOne<Table extends Tables[number], Returns extends RecordUpdateReturns>
+        (table: Table, patch: RecordTablePatch<Table>, returns: Returns)
+        : RecordWritableExecutable<Tables, readonly [RecordUpdateResult<Table, RecordTablePatch<Table>, Returns>]> {
+
         return this.writer().updateOne(table, patch, returns);
     }
 
-    updateMany<Table extends Tables[number], Returns extends RecordUpdateReturns = 'id'>(table: Table, patches: readonly RecordTablePatch<Table>[], returns?: Returns) {
+    updateMany<Table extends Tables[number], Returns extends RecordUpdateReturns>
+        (table: Table, patches: readonly RecordTablePatch<Table>[], returns: Returns)
+        : RecordWritableExecutable<Tables, readonly [RecordUpdateResult<Table, readonly RecordTablePatch<Table>[], Returns>]> {
+
         return this.writer().updateMany(table, patches, returns);
     }
 }

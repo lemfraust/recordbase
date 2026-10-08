@@ -1,4 +1,4 @@
-import { RecordField, RecordGroup, RecordSchema } from "./RecordSchema";
+import { RecordElement, RecordField, RecordGroup, RecordSchema } from "./RecordSchema";
 import { Simplify } from "./util";
 
 export type RecordId = string | number;
@@ -53,13 +53,12 @@ export type RecordPatch<Schema extends RecordSchema> = Simplify<{
 }>;
 
 
-type _RecordNames<Schema extends RecordSchema> = {
-    [Item in Schema[number] as Item['name']]:
-        Item extends RecordField<any, any, any>
-            ? Item['name']
-            : Item extends RecordGroup<any, infer Fields, any>
-                ? Item['name'] | `${Item['name']}.${_RecordNames<Fields>[keyof _RecordNames<Fields>]}`
-                : never;
-};
+type RecordElementNames<Element extends RecordElement> =
+    Element extends RecordField<infer Name>
+        ? Name
+        : Element extends RecordGroup<infer Name, infer Fields>
+            ? Name | `${Name}.${Fields[number]['name']}`
+            : never;
 
-export type RecordNames<Schema extends RecordSchema> = _RecordNames<Schema>[keyof _RecordNames<Schema>];
+export type RecordNames<Schema extends RecordSchema> =
+    RecordElementNames<Schema[number]>;

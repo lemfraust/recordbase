@@ -97,7 +97,10 @@ const enumParser = <const Enum extends readonly string[]>(values: Enum, caseSens
         ? (value: string) => values.find(item => item === value)
         : (value: string) => values.find(item => item.toLowerCase() === value.toLowerCase());
 
-    return (value: string) => {
+    return (value: unknown) => {
+        if (typeof value !== 'string')
+            return expected(value, ...values);
+
         const match = find(value);
 
         return match !== undefined
@@ -127,7 +130,10 @@ const getPhoneNumber = (text: string, format: PhoneFormatter = defaultPhoneForma
         return format({ area, start, end });
 };
 
-const phoneParser = (format?: PhoneFormatter) => (value: string) => {
+const phoneParser = (format?: PhoneFormatter) => (value: unknown) => {
+    if (typeof value !== 'string')
+        return expected(value, 'a phone number');
+
     const phone = getPhoneNumber(value, format);
 
     return phone
