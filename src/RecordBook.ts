@@ -1,5 +1,5 @@
 import { RecordReadable, RecordReadBuilder, RecordWritable, RecordWritableExecutable, RecordWriteBuilder } from "./RecordOperationBuilders";
-import { RecordReadOperation, RecordReadResults, RecordUpdateResult, RecordUpdateReturns, RecordWriteOperation, RecordWriteResults } from "./RecordOperations";
+import { RecordAddResult, RecordReadOperation, RecordReadResults, RecordUpdateResult, RecordWriteOperation, RecordWriteResults, RecordWriteReturns } from "./RecordOperations";
 import { RecordCache, RecordMemoryCache } from "./RecordCache";
 import { RecordElement } from "./RecordSchema";
 import { RecordEntry, RecordId } from "./RecordShapes";
@@ -175,68 +175,121 @@ export class RecordBook<const Tables extends readonly RecordTable[]>
         return results as RecordReadResults<Reads>;
     }
 
-    async write<const Writes extends readonly RecordWriteOperation<Tables[number]>[]>(writes: Writes): Promise<RecordWriteResults<Writes>> {
-        const results = await this.#store.write(writes);
+    async write<const Writes extends readonly RecordWriteOperation<Tables[number]>[]>
+        (writes: Writes)
+        : Promise<RecordWriteResults<Writes>> {
 
-        for (let i = 0; i < writes.length; i++) {
-            const write = writes[i];
-            const result = results[i];
-
-            const table = write.table;
-            const cache = this.#caches.get(table);
-
-
-            if (write.type === 'add') {
-                const added = isArray(write.data) ? write.data.length : 1;
-
-                if (cache) {
-                    const complete = cache.complete;
-
-                    if (complete)
-                        cache.complete = false;
-
-                    cache.set(result as any);
-                }
+        const storeWrites = writes.map(write => {
+            if (
+                write.type === 'add' &&
+                write.returns === undefined &&
+                this.#caches.has(write.table)
+            ) {
+                return {
+                    ...write,
+                    returns: 'id' as const
+                };
             }
-            else if (write.returns === 'entry') {
-                if (cache) {
-                    const complete = cache.complete;
 
-                    if (complete)
-                        cache.complete = false;
+            return write;
+        }) as readonly RecordWriteOperation<Tables[number]>[];
 
-                    cache.set(result as any);
-                }
-            }
-            else if (cache) {
+        const storeResults = await this.#store.write(storeWrites);
+        const results: unknown[] = [];
+
+        for (let index = 0; index < writes.length; index++) {
+            const write = writes[index];
+            const storeWrite = storeWrites[index];
+            const storeResult = storeResults[index];
+
+            const cache = this.#caches.get(write.table) as
+                | RecordCache<RecordTableSchema<typeof write.table>>
+                | undefined;
+
+            if (cache) {
                 const complete = cache.complete;
 
-                if (complete)
-                    cache.complete = false;
+                if (write.type === 'add' && storeWrite.type === 'add') {
+                    const data = isArray(write.data)
+                        ? write.data
+                        : [write.data];
 
-                const patches = isArray(write.patches)
-                    ? write.patches
-                    : [write.patches];
+                    if (storeWrite.returns === 'entry') {
+                        if (storeResult === undefined)
+                            throw new Error(`Expected entries from add to table "${write.table.name}"`);
 
-                for (const patch of patches) {
-                    const entry = cache.get(patch.$id);
+                        const entries = (
+                            Array.isArray(storeResult)
+                                ? storeResult
+                                : [storeResult]
+                        ) as RecordTableEntry<typeof write.table>[];
 
-                    if (!entry) {
-                        if (complete)
-                            throw new Error(this.#missingCacheRecord(patch.$id, table.name));
-
-                        continue;
+                        cache.set(entries);
                     }
+                    else if (storeWrite.returns === 'id') {
+                        if (storeResult === undefined)
+                            throw new Error(`Expected IDs from add to table "${write.table.name}"`);
 
-                    cache.set(this.#applyPatch(table, entry as any, patch as any));
+                        const ids = (
+                            Array.isArray(storeResult)
+                                ? storeResult
+                                : [storeResult]
+                        ) as RecordId[];
+
+                        if (ids.length !== data.length)
+                            throw new Error(`Expected ${data.length} IDs but received ${ids.length}`);
+
+                        const entries = data.map((data, index) => ({
+                            ...data,
+                            $id: ids[index]
+                        })) as RecordTableEntry<typeof write.table>[];
+
+                        cache.set(entries);
+                    }
                 }
+                else if (write.type === 'update') {
+                    const patches = isArray(write.patches)
+                        ? write.patches
+                        : [write.patches];
+
+                    if (write.returns === 'entry') {
+                        if (storeResult === undefined)
+                            throw new Error(`Expected entries from update to table "${write.table.name}"`);
+
+                        const entries = (
+                            Array.isArray(storeResult)
+                                ? storeResult
+                                : [storeResult]
+                        ) as RecordTableEntry<typeof write.table>[];
+
+                        cache.set(entries);
+                    }
+                    else {
+                        for (const patch of patches) {
+                            const entry = cache.get(patch.$id);
+
+                            if (entry)
+                                cache.set(this.#applyPatch(write.table, entry, patch));
+                            else if (cache.complete)
+                                throw new Error(
+                                    `Record "${patch.$id}" does not exist in table "${write.table.name}"`
+                                );
+                        }
+                    }
+                }
+
+                cache.complete = complete;
             }
+
+            results.push(
+                write.returns === undefined
+                    ? undefined
+                    : storeResult
+            );
         }
 
-        return results;
+        return results as RecordWriteResults<Writes>;
     }
-
-
 
     #missingCacheRecord(id: RecordId, table: string) {
         return `Record "${id}" does not exist in complete cache for table "${table}"`;
@@ -306,25 +359,24 @@ export class RecordBook<const Tables extends readonly RecordTable[]>
 
 
     /* Fluent writes */
-    addOne<Table extends Tables[number]>(table: Table, data: RecordTableData<Table>) {
-        return this.writer().addOne(table, data);
+    addOne<Table extends Tables[number], Returns extends RecordWriteReturns = undefined>
+        (table: Table, data: RecordTableData<Table>, returns?: Returns)
+        : RecordWritableExecutable<Tables, readonly [RecordAddResult<Table, RecordTableData<Table>, Returns>]> {
+        return this.writer().addOne(table, data, returns);
     }
-
-    addMany<Table extends Tables[number]>(table: Table, data: readonly RecordTableData<Table>[]) {
-        return this.writer().addMany(table, data);
+    addMany<Table extends Tables[number], Returns extends RecordWriteReturns = undefined>
+        (table: Table, data: readonly RecordTableData<Table>[], returns?: Returns)
+        : RecordWritableExecutable<Tables, readonly [RecordAddResult<Table, readonly RecordTableData<Table>[], Returns>]> {
+        return this.writer().addMany(table, data, returns);
     }
-
-    updateOne<Table extends Tables[number], Returns extends RecordUpdateReturns>
-        (table: Table, patch: RecordTablePatch<Table>, returns: Returns)
+    updateOne<Table extends Tables[number], Returns extends RecordWriteReturns = undefined>
+        (table: Table, patch: RecordTablePatch<Table>, returns?: Returns)
         : RecordWritableExecutable<Tables, readonly [RecordUpdateResult<Table, RecordTablePatch<Table>, Returns>]> {
-
         return this.writer().updateOne(table, patch, returns);
     }
-
-    updateMany<Table extends Tables[number], Returns extends RecordUpdateReturns>
-        (table: Table, patches: readonly RecordTablePatch<Table>[], returns: Returns)
+    updateMany<Table extends Tables[number], Returns extends RecordWriteReturns = undefined>
+        (table: Table, patches: readonly RecordTablePatch<Table>[], returns?: Returns)
         : RecordWritableExecutable<Tables, readonly [RecordUpdateResult<Table, readonly RecordTablePatch<Table>[], Returns>]> {
-
         return this.writer().updateMany(table, patches, returns);
     }
 }

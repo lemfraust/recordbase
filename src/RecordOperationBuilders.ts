@@ -1,7 +1,8 @@
 import {
-    RecordAddOperation, RecordReadOperation, RecordReadResult, RecordReadResults, RecordUpdateOperation,
+    RecordAddOperation, RecordAddResult, RecordReadOperation, RecordReadResult, RecordReadResults, RecordUpdateOperation,
     RecordUpdateResult,
-    RecordUpdateReturns, RecordWriteOperation, RecordWriteResult, RecordWriteResults
+    RecordWriteOperation, RecordWriteResult, RecordWriteResults,
+    RecordWriteReturns
 } from "./RecordOperations";
 import { RecordId } from "./RecordShapes";
 import { RecordReader, RecordWriter } from "./RecordStore";
@@ -47,18 +48,20 @@ export interface RecordWritable<
     Tables extends readonly RecordTable[],
     Results extends readonly unknown[] = []
 > {
-    addOne<Table extends Tables[number]>(table: Table, data: RecordTableData<Table>)
-        : RecordWritableExecutable<Tables, Append<Results, RecordTableEntry<Table>>>;
+    addOne<Table extends Tables[number], Returns extends RecordWriteReturns = undefined>
+        (table: Table, data: RecordTableData<Table>, returns?: Returns)
+        : RecordWritableExecutable<Tables, Append<Results, RecordAddResult<Table, RecordTableData<Table>, Returns>>>;
 
-    addMany<Table extends Tables[number]>(table: Table, data: readonly RecordTableData<Table>[])
-        : RecordWritableExecutable<Tables, Append<Results, RecordTableEntry<Table>[]>>;
+    addMany<Table extends Tables[number], Returns extends RecordWriteReturns = undefined>
+        (table: Table, data: readonly RecordTableData<Table>[], returns?: Returns)
+        : RecordWritableExecutable<Tables, Append<Results, RecordAddResult<Table, readonly RecordTableData<Table>[], Returns>>>;
 
-    updateOne<Table extends Tables[number], Returns extends RecordUpdateReturns>
-        (table: Table, patch: RecordTablePatch<Table>, returns: Returns)
+    updateOne<Table extends Tables[number], Returns extends RecordWriteReturns = undefined>
+        (table: Table, patch: RecordTablePatch<Table>, returns?: Returns)
         : RecordWritableExecutable<Tables, Append<Results, RecordUpdateResult<Table, RecordTablePatch<Table>, Returns>>>;
 
-    updateMany<Table extends Tables[number], Returns extends RecordUpdateReturns>
-        (table: Table, patches: readonly RecordTablePatch<Table>[], returns: Returns)
+    updateMany<Table extends Tables[number], Returns extends RecordWriteReturns = undefined>
+        (table: Table, patches: readonly RecordTablePatch<Table>[], returns?: Returns)
         : RecordWritableExecutable<Tables, Append<Results, RecordUpdateResult<Table, readonly RecordTablePatch<Table>[], Returns>>>;
 }
 
@@ -141,28 +144,33 @@ export class RecordWriteBuilder<
         );
     }
 
-    addOne<Table extends Tables[number]>(table: Table, data: RecordTableData<Table>) {
-        return this.#append<RecordTableEntry<Table>>(
-            freeze({ type: 'add', table, data })
+    addOne<Table extends Tables[number], Returns extends RecordWriteReturns = undefined>
+        (table: Table, data: RecordTableData<Table>, returns?: Returns) {
+        return this.#append<RecordAddResult<Table, RecordTableData<Table>, Returns>>(
+            freeze({ type: 'add', table, data, returns })
         );
     }
-
-    addMany<Table extends Tables[number]>(table: Table, data: readonly RecordTableData<Table>[]) {
-        return this.#append<RecordTableEntry<Table>[]>(
-            freeze({ type: 'add', table, data: freeze([...data]) })
+    addMany<Table extends Tables[number], Returns extends RecordWriteReturns = undefined>
+        (table: Table, data: readonly RecordTableData<Table>[], returns?: Returns) {
+        return this.#append<RecordAddResult<Table, readonly RecordTableData<Table>[], Returns>>(
+            freeze({ type: 'add', table, data: freeze([...data]), returns })
         );
     }
-
-    updateOne<Table extends Tables[number], Returns extends RecordUpdateReturns>
-        (table: Table, patch: RecordTablePatch<Table>, returns: Returns)
+    updateOne<Table extends Tables[number], Returns extends RecordWriteReturns = undefined>
+        (table: Table, patch: RecordTablePatch<Table>, returns?: Returns)
         : RecordWritableExecutable<Tables, Append<Results, RecordUpdateResult<Table, RecordTablePatch<Table>, Returns>>> {
-        return this.#append(freeze({ type: 'update', table, patches: patch, returns }));
+
+        return this.#append<RecordUpdateResult<Table, RecordTablePatch<Table>, Returns>>(
+            freeze({ type: 'update', table, patches: patch, returns })
+        );
     }
 
-    updateMany<Table extends Tables[number], Returns extends RecordUpdateReturns>
-        (table: Table, patches: readonly RecordTablePatch<Table>[], returns: Returns)
+    updateMany<Table extends Tables[number], Returns extends RecordWriteReturns = undefined>
+        (table: Table, patches: readonly RecordTablePatch<Table>[], returns?: Returns)
         : RecordWritableExecutable<Tables, Append<Results, RecordUpdateResult<Table, readonly RecordTablePatch<Table>[], Returns>>> {
-        return this.#append(freeze({ type: 'update', table, patches: freeze([...patches]), returns }));
+        return this.#append<RecordUpdateResult<Table, readonly RecordTablePatch<Table>[], Returns>>(
+            freeze({ type: 'update', table, patches: freeze([...patches]), returns })
+        );
     }
 
     with(writer: RecordWriter<Tables>) {
