@@ -1,7 +1,7 @@
 import { RecordElement, RecordField, RecordGroup, RecordSchema } from "./RecordSchema";
 import { Simplify } from "./util";
 
-export type RecordId = string | number;
+export type RecordRef = string | number;
 
 export type RecordGroupObject<Fields extends RecordField<any, any, boolean>[]> = Simplify<{
     [Item in Fields[number] as Item['isOptional'] extends false ? Item['name'] : never]:
@@ -30,7 +30,7 @@ export type RecordObject<Schema extends RecordSchema> = Simplify<{
                 ? RecordGroupObject<Fields> | null
                 : never;
 } & {
-    $id?: RecordId;
+    $ref?: RecordRef;
 }>;
 
 
@@ -49,7 +49,7 @@ export type RecordPatch<Schema extends RecordSchema> = Simplify<{
                 ? Optional extends true ? RecordGroupPatch<Fields> | null : RecordGroupPatch<Fields>
                 : never;
 } & {
-    readonly $id: RecordId;
+    readonly $id: RecordRef;
 }>;
 
 

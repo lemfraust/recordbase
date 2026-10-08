@@ -1,11 +1,17 @@
-import { RecordId } from "./RecordShapes";
+import { RecordRef } from "./RecordShapes";
 import { RecordTable, RecordTableData, RecordTableEntry, RecordTablePatch } from "./RecordTable";
 
 
+/* Return */
+export const RecordReturn = Object.freeze({ Ref: 'ref', Data: 'data' } as const);
+export type RecordReturnRef = (typeof RecordReturn)['Ref'];
+export type RecordReturnData = (typeof RecordReturn)['Data'];
+export type RecordReturn = RecordReturnRef | RecordReturnData | undefined;
+
 /* Read */
 export type RecordReadItems =
-    | { id: RecordId; }
-    | { ids: readonly RecordId[]; }
+    | { ref: RecordRef; }
+    | { refs: readonly RecordRef[]; }
     | 'all';
 
 export type RecordReadOperation<
@@ -22,21 +28,19 @@ export type RecordReadResult<
     Items extends RecordReadItems
 > =
     Items extends 'count'
-        ? number
-        : Items extends 'all' | { ids: readonly RecordId[]; }
-            ? RecordTableEntry<Table>[]
-            : RecordTableEntry<Table>;
+    ? number
+    : Items extends 'all' | { refs: readonly RecordRef[]; }
+    ? RecordTableEntry<Table>[]
+    : RecordTableEntry<Table>;
 
 export type RecordReadResults<Reads extends readonly RecordReadOperation[]> = {
     [Index in keyof Reads]:
-        Reads[Index] extends RecordReadOperation<infer Table, infer Items>
-            ? RecordReadResult<Table, Items>
-            : never;
+    Reads[Index] extends RecordReadOperation<infer Table, infer Items>
+    ? RecordReadResult<Table, Items>
+    : never;
 };
 
 /* Write */
-export type RecordWriteReturns = 'id' | 'entry' | undefined;
-
 
 /* Add */
 export type RecordAddData<Table extends RecordTable> =
@@ -46,7 +50,7 @@ export type RecordAddData<Table extends RecordTable> =
 export type RecordAddOperation<
     Table extends RecordTable = RecordTable,
     Data extends RecordAddData<Table> = RecordAddData<Table>,
-    Returns extends RecordWriteReturns = RecordWriteReturns
+    Returns extends RecordReturn = RecordReturn
 > = {
     type: 'add';
     table: Table;
@@ -57,13 +61,13 @@ export type RecordAddOperation<
 export type RecordAddResult<
     Table extends RecordTable,
     Data extends RecordAddData<Table>,
-    Returns extends RecordWriteReturns
+    Returns extends RecordReturn
 > =
-    Returns extends 'entry'
-        ? Data extends readonly RecordTableData<Table>[] ? RecordTableEntry<Table>[] : RecordTableEntry<Table>
-        : Returns extends 'id'
-            ? Data extends readonly RecordTableData<Table>[] ? RecordId[] : RecordId
-            : undefined;
+    Returns extends RecordReturnData
+    ? Data extends readonly RecordTableData<Table>[] ? RecordTableEntry<Table>[] : RecordTableEntry<Table>
+    : Returns extends RecordReturnRef
+    ? Data extends readonly RecordTableData<Table>[] ? RecordRef[] : RecordRef
+    : undefined;
 
 
 /* Update */
@@ -74,7 +78,7 @@ export type RecordUpdatePatches<Table extends RecordTable> =
 export type RecordUpdateOperation<
     Table extends RecordTable = RecordTable,
     Patches extends RecordUpdatePatches<Table> = RecordUpdatePatches<Table>,
-    Returns extends RecordWriteReturns = RecordWriteReturns
+    Returns extends RecordReturn = RecordReturn
 > = {
     type: 'update';
     table: Table;
@@ -85,13 +89,13 @@ export type RecordUpdateOperation<
 export type RecordUpdateResult<
     Table extends RecordTable,
     Patches extends RecordUpdatePatches<Table>,
-    Returns extends RecordWriteReturns
+    Returns extends RecordReturn
 > =
-    Returns extends 'entry'
-        ? Patches extends readonly RecordTablePatch<Table>[] ? RecordTableEntry<Table>[] : RecordTableEntry<Table>
-        : Returns extends 'id'
-            ? Patches extends readonly RecordTablePatch<Table>[] ? RecordId[] : RecordId
-            : undefined;
+    Returns extends RecordReturnData
+    ? Patches extends readonly RecordTablePatch<Table>[] ? RecordTableEntry<Table>[] : RecordTableEntry<Table>
+    : Returns extends RecordReturnRef
+    ? Patches extends readonly RecordTablePatch<Table>[] ? RecordRef[] : RecordRef
+    : undefined;
 
 
 /* Operations */
@@ -101,14 +105,14 @@ export type RecordWriteOperation<Table extends RecordTable = RecordTable> =
 
 export type RecordWriteResult<Write extends RecordWriteOperation> =
     Write extends RecordAddOperation<infer Table, infer Data, infer Returns>
-        ? RecordAddResult<Table, Data, Returns>
-        : Write extends RecordUpdateOperation<infer Table, infer Patches, infer Returns>
-            ? RecordUpdateResult<Table, Patches, Returns>
-            : never;
+    ? RecordAddResult<Table, Data, Returns>
+    : Write extends RecordUpdateOperation<infer Table, infer Patches, infer Returns>
+    ? RecordUpdateResult<Table, Patches, Returns>
+    : never;
 
 export type RecordWriteResults<Writes extends readonly RecordWriteOperation[]> = {
     [Index in keyof Writes]:
-        Writes[Index] extends RecordWriteOperation
-            ? RecordWriteResult<Writes[Index]>
-            : never;
+    Writes[Index] extends RecordWriteOperation
+    ? RecordWriteResult<Writes[Index]>
+    : never;
 };

@@ -2,11 +2,10 @@ import { RecordElement, RecordField, RecordGroup, RecordSchema } from "./RecordS
 import { Simplify } from "./util";
 
 
-export type RecordId = string | number;
+export type RecordRef = string | number;
 
 
 /* Data */
-
 type RecordDataValue<Item extends RecordElement> =
     Item extends RecordField<any, infer Type, any>
         ? Type
@@ -54,13 +53,13 @@ export type RecordPartial<Schema extends RecordSchema> =
 
 export type RecordEntry<Schema extends RecordSchema> = Simplify<
     RecordDataShape<Schema> & {
-        readonly $id: RecordId;
+        readonly $ref: RecordRef;
     }
 >;
 
 export type RecordPatch<Schema extends RecordSchema> = Simplify<
     RecordPartialShape<Schema> & {
-        readonly $id: RecordId;
+        readonly $ref: RecordRef;
     }
 >;
 
