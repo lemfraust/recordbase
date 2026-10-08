@@ -4,10 +4,9 @@ import { RecordTable, RecordTableData, RecordTableEntry, RecordTablePatch } from
 
 /* Read */
 export type RecordReadItems =
-    | 'count'
-    | 'all'
     | { id: RecordId; }
-    | { ids: readonly RecordId[]; };
+    | { ids: readonly RecordId[]; }
+    | 'all';
 
 export type RecordReadOperation<
     Table extends RecordTable = RecordTable,

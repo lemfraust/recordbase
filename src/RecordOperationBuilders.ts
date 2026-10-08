@@ -34,9 +34,6 @@ export interface RecordReadable<
 
     getAll<Table extends Tables[number]>(table: Table)
         : RecordReadableExecutable<Tables, Append<Results, RecordTableEntry<Table>[]>>;
-
-    count<Table extends Tables[number]>(table: Table)
-        : RecordReadableExecutable<Tables, Append<Results, number>>;
 }
 
 export interface RecordReadableExecutable<
@@ -105,10 +102,6 @@ export class RecordReadBuilder<
 
     getAll<Table extends Tables[number]>(table: Table) {
         return this.#append(freeze({ type: 'read', table, items: 'all' }));
-    }
-
-    count<Table extends Tables[number]>(table: Table) {
-        return this.#append(freeze({ type: 'read', table, items: 'count' }));
     }
 
     with(reader: RecordReader<Tables>) {

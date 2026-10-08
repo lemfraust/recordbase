@@ -16,8 +16,6 @@ export class RecordBook<const Tables extends readonly RecordTable[]>
 
     readonly #store: RecordStore<Tables>;
     readonly #caches = new Map<RecordTable, RecordCache>();
-    readonly #counts = new Map<RecordTable, number>();
-
 
     #loaders: readonly RecordReadOperation<Tables[number], 'all'>[] | undefined;
 
@@ -69,19 +67,16 @@ export class RecordBook<const Tables extends readonly RecordTable[]>
                 cache.clear();
                 cache.set(results[i] as any);
                 cache.complete = true;
-                this.#counts.set(read.table, cache.count);
             }
         }
     }
 
     invalidate(): void {
-
         for (const cache of this.#caches.values()) {
             cache.complete = false;
             cache.clear();
         }
 
-        this.#counts.clear();
         this.#store.invalidate();
     }
 
@@ -104,18 +99,6 @@ export class RecordBook<const Tables extends readonly RecordTable[]>
             if (read.items === 'all') {
                 if (cache?.complete)
                     results[i] = [...cache.records()];
-                else
-                    fetch = true;
-            }
-            else if (read.items === 'count') {
-                const count = this.#counts.get(read.table);
-
-                if (count !== undefined)
-                    results[i] = count;
-                else if (cache?.complete) {
-                    results[i] = cache.count;
-                    this.#counts.set(read.table, cache.count);
-                }
                 else
                     fetch = true;
             }
@@ -169,17 +152,8 @@ export class RecordBook<const Tables extends readonly RecordTable[]>
                 const cache = this.#caches.get(table);
 
 
-                if (read.items === 'count') {
-                    const count = fetched[i] as number;
-                    this.#counts.set(table, count);
-
-                    if (cache && cache.count === count)
-                        cache.complete = true;
-                }
-                else if (read.items === 'all') {
+                if (read.items === 'all') {
                     const records = fetched[i] as RecordEntry<any>[];
-
-                    this.#counts.set(table, records.length);
 
                     if (cache) {
                         cache.complete = false;
@@ -189,15 +163,11 @@ export class RecordBook<const Tables extends readonly RecordTable[]>
                     }
                 }
                 else if (cache) {
-                    const count = this.#counts.get(table);
 
                     if ('id' in read.items)
                         cache.set(fetched[i] as RecordEntry<any>);
                     else
                         cache.set(fetched[i] as RecordEntry<any>[]);
-
-                    if (count !== undefined && cache.count === count)
-                        cache.complete = true;
                 }
             }
         }
@@ -218,10 +188,6 @@ export class RecordBook<const Tables extends readonly RecordTable[]>
 
             if (write.type === 'add') {
                 const added = isArray(write.data) ? write.data.length : 1;
-                const count = this.#counts.get(table);
-
-                if (count !== undefined)
-                    this.#counts.set(table, count + added);
 
                 if (cache) {
                     const complete = cache.complete;
@@ -230,11 +196,6 @@ export class RecordBook<const Tables extends readonly RecordTable[]>
                         cache.complete = false;
 
                     cache.set(result as any);
-
-                    const count = this.#counts.get(table);
-
-                    if (complete || (count !== undefined && cache.count === count))
-                        cache.complete = true;
                 }
             }
             else if (write.returns === 'entry') {
@@ -245,11 +206,6 @@ export class RecordBook<const Tables extends readonly RecordTable[]>
                         cache.complete = false;
 
                     cache.set(result as any);
-
-                    const count = this.#counts.get(table);
-
-                    if (complete || (count !== undefined && cache.count === count))
-                        cache.complete = true;
                 }
             }
             else if (cache) {
@@ -274,11 +230,6 @@ export class RecordBook<const Tables extends readonly RecordTable[]>
 
                     cache.set(this.#applyPatch(table, entry as any, patch as any));
                 }
-
-                const count = this.#counts.get(table);
-
-                if (complete || (count !== undefined && cache.count === count))
-                    cache.complete = true;
             }
         }
 
@@ -351,10 +302,6 @@ export class RecordBook<const Tables extends readonly RecordTable[]>
 
     getAll<Table extends Tables[number]>(table: Table) {
         return this.reader().getAll(table);
-    }
-
-    count<Table extends Tables[number]>(table: Table) {
-        return this.reader().count(table);
     }
 
 
