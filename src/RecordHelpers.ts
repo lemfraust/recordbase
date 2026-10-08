@@ -1,9 +1,8 @@
-import { Result } from "./Result";
-import { RecordFieldBuilder, RecordGroupBuilder } from "./RecordBuilders";
-import { RecordField, RecordParser, RecordProcessor, RecordSchema } from "./RecordSchema";
-import { RecordTable } from "./RecordTable";
-import { RecordStore } from "./RecordStore";
 import { RecordBook } from "./RecordBook";
+import { RecordField, RecordFieldBuilder, RecordGroupBuilder, RecordParser, RecordProcessor, RecordSchema } from "./RecordSchema";
+import { RecordStore } from "./RecordStore";
+import { RecordTable } from "./RecordTable";
+import { Result } from "./Result";
 
 const book = <const Tables extends readonly RecordTable<any, RecordSchema>[]>(
     store: RecordStore<Tables>
@@ -167,16 +166,5 @@ const dateField = <const Name extends string>(name: Name, parser?: RecordParser<
 
 
 export {
-    book,
-    table,
-    group,
-    field,
-    booleanField as boolean,
-    numberField as number,
-    currencyField as currency,
-    percentField as percent,
-    stringField as string,
-    enumField as enum,
-    phoneField as phone,
-    dateField as date
+    book, booleanField as boolean, currencyField as currency, dateField as date, enumField as enum, field, group, numberField as number, percentField as percent, phoneField as phone, stringField as string, table
 };
