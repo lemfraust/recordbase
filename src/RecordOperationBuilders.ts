@@ -1,15 +1,10 @@
 import {
-    RecordAddOperation,
-    RecordReadOperation,
-    RecordReadResults,
-    RecordUpdateOperation,
-    RecordUpdateReturns,
-    RecordWriteOperation,
-    RecordWriteResults
+    RecordAddOperation, RecordReadOperation, RecordReadResults, RecordUpdateOperation,
+    RecordUpdateReturns, RecordWriteOperation, RecordWriteResults
 } from "./RecordOperations";
-import { RecordReader, RecordWriter } from "./RecordOperators";
 import { RecordSchema } from "./RecordSchema";
 import { RecordId } from "./RecordShapes";
+import { RecordReader, RecordWriter } from "./RecordStore";
 import { RecordTable, RecordTableData, RecordTablePatch } from "./RecordTable";
 
 
@@ -25,7 +20,7 @@ export type RecordWriteBuilderResult<Writes extends readonly RecordWriteOperatio
     RecordBuilderResult<RecordWriteResults<Writes>>;
 
 
-// Read
+/* Read */
 export interface RecordReadable<
     Tables extends readonly RecordTable<any, RecordSchema>[],
     Reads extends readonly RecordReadOperation<Tables[number], any>[] = []
@@ -98,7 +93,7 @@ export class RecordReadBuilder<
 }
 
 
-// Write
+/* Write */
 
 export interface RecordWritable<
     Tables extends readonly RecordTable<any, RecordSchema>[],

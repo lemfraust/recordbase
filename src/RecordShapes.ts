@@ -1,6 +1,4 @@
-import { RecordField } from "./RecordField";
-import { RecordGroup } from "./RecordGroup";
-import { RecordElement, RecordSchema } from "./RecordSchema";
+import { RecordElement, RecordField, RecordGroup, RecordSchema } from "./RecordSchema";
 import { Simplify } from "./util";
 
 

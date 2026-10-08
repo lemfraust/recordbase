@@ -1,7 +1,5 @@
-import { RecordField } from "./RecordField";
-import { RecordGroup } from "./RecordGroup";
 import { RecordGroupObject } from "./RecordObject";
-import { RecordEncoder, RecordParser, RecordValidator } from "./RecordProcessor";
+import { RecordEncoder, RecordField, RecordGroup, RecordParser, RecordValidator } from "./RecordSchema";
 
 export class RecordFieldBuilder<
     const Name extends string,

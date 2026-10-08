@@ -1,6 +1,4 @@
-import { RecordField } from "./RecordField";
-import { RecordGroup } from "./RecordGroup";
-import { RecordSchema } from "./RecordSchema";
+import { RecordField, RecordGroup, RecordSchema } from "./RecordSchema";
 import { Simplify } from "./util";
 
 export type RecordId = string | number;

@@ -3,7 +3,6 @@ import { RecordTable, RecordTableData, RecordTableEntry, RecordTablePatch } from
 
 
 /* Read */
-
 export type RecordReadItems =
     | { id: RecordId; }
     | { ids: readonly RecordId[]; }
@@ -38,7 +37,6 @@ export type RecordReadResults<Reads extends readonly RecordReadOperation<any, an
 
 
 /* Add */
-
 export type RecordAddData<Table extends RecordTable<any, any>> =
     RecordTableData<Table> | readonly RecordTableData<Table>[];
 
@@ -61,7 +59,6 @@ export type RecordAddResult<
 
 
 /* Update */
-
 export type RecordUpdatePatches<Table extends RecordTable<any, any>> =
     RecordTablePatch<Table> | readonly RecordTablePatch<Table>[];
 
@@ -89,7 +86,6 @@ export type RecordUpdateResult<
 
 
 /* Write */
-
 export type RecordWriteOperation<Table extends RecordTable<any, any>> =
     | RecordAddOperation<Table>
     | RecordUpdateOperation<Table, RecordUpdatePatches<Table>, RecordUpdateReturns>;

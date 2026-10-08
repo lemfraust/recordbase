@@ -1,8 +1,6 @@
 import { Result } from "./Result";
-import { RecordField } from "./RecordField";
 import { RecordFieldBuilder, RecordGroupBuilder } from "./RecordBuilders";
-import { RecordParser, RecordProcessor } from "./RecordProcessor";
-import { RecordSchema } from "./RecordSchema";
+import { RecordField, RecordParser, RecordProcessor, RecordSchema } from "./RecordSchema";
 import { RecordTable } from "./RecordTable";
 import { RecordStore } from "./RecordStore";
 import { RecordBook } from "./RecordBook";
