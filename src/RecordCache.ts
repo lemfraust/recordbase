@@ -2,7 +2,7 @@ import { RecordEntry, RecordId } from "./RecordShapes";
 import { RecordSchema } from "./RecordSchema";
 import { isArray } from "./util";
 
-export interface RecordCache<Schema extends RecordSchema> {
+export interface RecordCache<Schema extends RecordSchema = RecordSchema> {
     readonly auto: boolean;
 
     readonly count: number;
@@ -18,7 +18,7 @@ export interface RecordCache<Schema extends RecordSchema> {
     clear(id?: RecordId): void;
 }
 
-export class RecordMemoryCache<Schema extends RecordSchema> implements RecordCache<Schema> {
+export class RecordMemoryCache<Schema extends RecordSchema = RecordSchema> implements RecordCache<Schema> {
     #map = new Map<RecordId, RecordEntry<Schema>>();
 
     constructor(readonly auto: boolean) { }
@@ -35,12 +35,11 @@ export class RecordMemoryCache<Schema extends RecordSchema> implements RecordCac
         if (isArray(entries))
             entries.forEach(entry => this.#map.set(entry.$id, entry));
         else
-            this.#map.set(entries.$id, entries)
-
+            this.#map.set(entries.$id, entries);
     }
 
     clear(id?: RecordId): void {
-        if (id)
+        if (id !== undefined)
             this.#map.delete(id);
         else
             this.#map.clear();

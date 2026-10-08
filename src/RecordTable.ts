@@ -2,8 +2,8 @@ import { RecordData, RecordEntry, RecordPatch } from "./RecordShapes";
 import { RecordSchema } from "./RecordSchema";
 
 export class RecordTable<
-    const Name extends string,
-    const Schema extends RecordSchema
+    const Name extends string = string,
+    const Schema extends RecordSchema = RecordSchema
 > {
     constructor(
         public readonly name: Name,
@@ -15,19 +15,10 @@ export class RecordTable<
     }
 }
 
-export type RecordTableSchema<Table extends RecordTable<string, RecordSchema>> = Table extends RecordTable<string, infer Schema> ? Schema : never;
+export type RecordTableSchema<Table extends RecordTable> = Table['schema'];
 
-export type RecordTableData<Table extends RecordTable<any, any>> =
-    Table extends RecordTable<any, infer Schema>
-        ? RecordData<Schema>
-        : never;
+export type RecordTableData<Table extends RecordTable> = RecordData<Table['schema']>;
 
-export type RecordTableEntry<Table extends RecordTable<any, any>> =
-    Table extends RecordTable<any, infer Schema>
-        ? RecordEntry<Schema>
-        : never;
+export type RecordTableEntry<Table extends RecordTable> = RecordEntry<Table['schema']>;
 
-export type RecordTablePatch<Table extends RecordTable<any, any>> =
-    Table extends RecordTable<any, infer Schema>
-        ? RecordPatch<Schema>
-        : never;
+export type RecordTablePatch<Table extends RecordTable> = RecordPatch<Table['schema']>;
