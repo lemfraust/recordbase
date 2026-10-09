@@ -1,4 +1,4 @@
-import { RecordGroupObject } from "./RecordObject";
+import { RecordGroupData } from "./RecordShapes";
 import { Result } from "./Result";
 import { freeze } from "./util";
 
@@ -120,7 +120,7 @@ export class RecordGroupBuilder<
         freeze(this);
     }
 
-    get type(): RecordGroupObject<Fields> {
+    get type(): RecordGroupData<Fields> {
         throw new Error('This is a type helper and should not be used at runtime');
     }
 

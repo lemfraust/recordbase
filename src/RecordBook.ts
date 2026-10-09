@@ -6,7 +6,7 @@ import { RecordEntry } from "./RecordShapes";
 import { RecordReader, RecordStore, RecordWriter } from "./RecordStore";
 import { RecordTable, RecordTableData, RecordTableEntry, RecordTablePatch, RecordTableSchema } from "./RecordTable";
 import { isArray } from "./util";
-import { RecordRef } from "./RecordObject";
+import { RecordRef } from "./RecordShapes";
 
 export type RecordCacheConfig = { auto: boolean; };
 
