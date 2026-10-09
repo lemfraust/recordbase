@@ -1,5 +1,6 @@
 import { RecordGroupObject } from "./RecordObject";
 import { Result } from "./Result";
+import { freeze } from "./util";
 
 /* Value */
 export type RecordValue = string | number | boolean | Date | { formula: string; } | null | undefined;
@@ -62,7 +63,7 @@ export class RecordFieldBuilder<
         public readonly validate: RecordValidator<Type>,
         public readonly parse: RecordParser<Type>,
         public readonly encode: RecordEncoder<Type>
-    ) { }
+    ) { freeze(this); }
 
     optional(): RecordFieldBuilder<Name, Type, true> {
         return new RecordFieldBuilder(
@@ -114,7 +115,10 @@ export class RecordGroupBuilder<
         public readonly name: Name,
         public readonly isOptional: Optional,
         public readonly fields: Fields
-    ) { }
+    ) {
+        this.fields = freeze([...fields]) as unknown as Fields;
+        freeze(this);
+    }
 
     get type(): RecordGroupObject<Fields> {
         throw new Error('This is a type helper and should not be used at runtime');
