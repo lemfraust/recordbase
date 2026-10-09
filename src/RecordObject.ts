@@ -30,7 +30,7 @@ export type RecordObject<Schema extends RecordSchema> = Simplify<{
                 ? RecordGroupObject<Fields> | null
                 : never;
 } & {
-    $ref?: RecordRef;
+    readonly $ref?: RecordRef;
 }>;
 
 
@@ -49,7 +49,7 @@ export type RecordPatch<Schema extends RecordSchema> = Simplify<{
                 ? Optional extends true ? RecordGroupPatch<Fields> | null : RecordGroupPatch<Fields>
                 : never;
 } & {
-    readonly $id: RecordRef;
+    readonly $ref: RecordRef;
 }>;
 
 
