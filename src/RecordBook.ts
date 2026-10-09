@@ -82,8 +82,9 @@ export class RecordBook<const Tables extends readonly RecordTable[]>
     }
 
 
-    // TODO: Refactor more
     /* Raw read/write */
+    // TODO: Refactor more
+    // TODO: Look into concurrent cache operations with revisions
     async read<const Reads extends readonly RecordReadOperation<Tables[number]>[]>(reads: Reads): Promise<RecordReadResults<Reads>> {
         const results = new Array(reads.length);
 
@@ -179,65 +180,40 @@ export class RecordBook<const Tables extends readonly RecordTable[]>
         (writes: Writes)
         : Promise<RecordWriteResults<Writes>> {
 
-        const storeWrites = writes.map(write => {
-            if (
-                write.type === 'add' &&
-                write.returns === undefined &&
-                this.#caches.has(write.table)
-            ) {
-                return {
-                    ...write,
-                    returns: RecordReturn.Ref
-                };
-            }
-
-            return write;
-        }) as readonly RecordWriteOperation<Tables[number]>[];
-
-        const storeResults = await this.#store.write(storeWrites);
-        const results: unknown[] = [];
+        const results = await this.#store.write(writes);
 
         for (let index = 0; index < writes.length; index++) {
             const write = writes[index];
-            const storeWrite = storeWrites[index];
-            const storeResult = storeResults[index];
+            const result = results[index];
 
             const cache = this.#caches.get(write.table) as
                 | RecordCache<RecordTableSchema<typeof write.table>>
                 | undefined;
 
             if (cache) {
-                const complete = cache.complete;
+                let complete = cache.complete;
 
-                if (write.type === 'add' && storeWrite.type === 'add') {
-                    const data = isArray(write.data)
-                        ? write.data
-                        : [write.data];
-
-                    if (storeWrite.returns === RecordReturn.Data) {
-                        if (storeResult === undefined)
-                            throw new Error(`Expected data from add to table "${write.table.name}"`);
-
+                // Add
+                if (write.type === 'add') {
+                    if (write.returns === RecordReturn.Data) {
                         const entries = (
-                            Array.isArray(storeResult)
-                                ? storeResult
-                                : [storeResult]
+                            Array.isArray(result)
+                                ? result
+                                : [result]
                         ) as RecordTableEntry<typeof write.table>[];
 
                         cache.set(entries);
                     }
-                    else if (storeWrite.returns === RecordReturn.Ref) {
-                        if (storeResult === undefined)
-                            throw new Error(`Expected refs from add to table "${write.table.name}"`);
+                    else if (write.returns === RecordReturn.Ref) {
+                        const data = isArray(write.data)
+                            ? write.data
+                            : [write.data];
 
                         const refs = (
-                            Array.isArray(storeResult)
-                                ? storeResult
-                                : [storeResult]
+                            Array.isArray(result)
+                                ? result
+                                : [result]
                         ) as RecordRef[];
-
-                        if (refs.length !== data.length)
-                            throw new Error(`Expected ${data.length} refs but received ${refs.length}`);
 
                         const entries = data.map((data, index) => ({
                             ...data,
@@ -246,20 +222,22 @@ export class RecordBook<const Tables extends readonly RecordTable[]>
 
                         cache.set(entries);
                     }
+                    else {
+                        complete = false;
+                    }
                 }
+
+                // Update
                 else if (write.type === 'update') {
                     const patches = isArray(write.patches)
                         ? write.patches
                         : [write.patches];
 
                     if (write.returns === RecordReturn.Data) {
-                        if (storeResult === undefined)
-                            throw new Error(`Expected data from update to table "${write.table.name}"`);
-
                         const entries = (
-                            Array.isArray(storeResult)
-                                ? storeResult
-                                : [storeResult]
+                            Array.isArray(result)
+                                ? result
+                                : [result]
                         ) as RecordTableEntry<typeof write.table>[];
 
                         cache.set(entries);
@@ -270,22 +248,14 @@ export class RecordBook<const Tables extends readonly RecordTable[]>
 
                             if (entry)
                                 cache.set(this.#applyPatch(write.table, entry, patch));
-                            else if (cache.complete)
-                                throw new Error(
-                                    `Record "${patch.$ref}" does not exist in table "${write.table.name}"`
-                                );
+                            else
+                                complete = false;
                         }
                     }
                 }
 
                 cache.complete = complete;
             }
-
-            results.push(
-                write.returns === undefined
-                    ? undefined
-                    : storeResult
-            );
         }
 
         return results as RecordWriteResults<Writes>;
