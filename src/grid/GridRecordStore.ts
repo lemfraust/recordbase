@@ -1,8 +1,10 @@
 import { RecordTable } from "../RecordTable";
-import { RecordSchema } from "../RecordSchema";
+import { RecordElement, RecordSchema } from "../RecordSchema";
 import { RecordStore } from "../RecordStore";
 import { GridProvider } from "./GridProvider";
 import { freeze } from "../util";
+import { RecordRef } from "../RecordShapes";
+import { GridAddress, GridRange } from "./GridAddress";
 
 export type GridTableOptions = {
     name: string;
@@ -18,13 +20,13 @@ type GridTableSources<Tables extends readonly RecordTable<any, RecordSchema>[]> 
 };
 
 
-export class GridRecordStore<
-    const Tables extends readonly RecordTable<any, RecordSchema>[]
-> {
+export class GridRecordStore<const Tables extends readonly RecordTable<any, RecordSchema>[]> {
     readonly tables: Tables;
 
     readonly #provider: GridProvider;
+
     readonly #options = new Map<RecordTable, GridTableOptions>();
+
 
     constructor(provider: GridProvider, sources: GridTableSources<Tables>) {
         this.#provider = provider;
@@ -44,6 +46,19 @@ export class GridRecordStore<
         }
 
         this.tables = freeze(tables) as unknown as Tables;
+    }
+
+
+    #locate(table: RecordTable, refs?: readonly RecordRef[]): GridRange[] {
+        const { name, offset } = this.#options.get(table)!;
+
+        // Get width of the entire row (maybe refactor this?)
+        const width = table.schema.reduce((count, element) => count + (RecordElement.isGroup(element) ? element.fields.length : 1), 0);
+
+        if (refs === undefined)
+            return [GridAddress.range(name, 0, offset, width)];
+        else
+            return refs.map(ref => GridAddress.range(name, 0, offset + Number(ref), width, 1));
     }
 }
 
