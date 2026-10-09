@@ -26,10 +26,7 @@ export type RecordReadOperation<
 export type RecordReadResult<
     Table extends RecordTable,
     Items extends RecordReadItems
-> =
-    Items extends 'count'
-    ? number
-    : Items extends 'all' | { refs: readonly RecordRef[]; }
+> = Items extends 'all' | { refs: readonly RecordRef[]; }
     ? RecordTableEntry<Table>[]
     : RecordTableEntry<Table>;
 
