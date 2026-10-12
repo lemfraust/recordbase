@@ -8,11 +8,14 @@ export type ExecutorHandler = (error: unknown, state?: any) => Promise<ExecutorR
 
 export const pause: (ms: number) => Promise<void> = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-export const retryHandler = (options: {
+
+export type RetryOptions = {
     attempts: number,
     wait?: number,
     onAttempt?: (error: unknown, attempt: number, final: boolean) => void | unknown;
-}) => {
+};
+
+export const retryHandler = (options: RetryOptions) => {
     const { attempts, wait, onAttempt } = options;
 
     if (attempts < 1)
