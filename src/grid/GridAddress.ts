@@ -22,7 +22,7 @@ const unletterfy = (value: string): number => {
     let result = 0;
 
     for (let i = 0; i < value.length; i++)
-        result = (result * 26) + (value.charCodeAt(i) - charCodeA + 1);
+        result = (result * 26) + (value.toUpperCase().charCodeAt(i) - charCodeA + 1);
 
     return result - 1;
 };
