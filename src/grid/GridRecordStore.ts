@@ -1,12 +1,13 @@
-import { RecordTable, RecordTableEntry } from "../RecordTable";
+import { RecordTable, RecordTableData, RecordTableEntry, RecordTablePatch } from "../RecordTable";
 import { RecordElement, RecordSchema } from "../RecordSchema";
 import { RecordStore } from "../RecordStore";
-import { GridProvider } from "./GridProvider";
-import { freeze } from "../util";
+import { GridProvider, GridSetRequest } from "./GridProvider";
+import { freeze, isArray, toArray, toLength } from "../util";
 import { RecordRef } from "../RecordShapes";
-import { GridAddress, GridRange } from "./GridAddress";
-import { RecordReadOperation, RecordReadResults } from "../RecordOperations";
+import { GridAddress, GridCoordinate, GridRange } from "./GridAddress";
+import { RecordReadOperation, RecordReadResults, RecordReturn, RecordWriteOperation, RecordWriteResults } from "../RecordOperations";
 import { Result } from "../Result";
+import { GridBlock, GridFetchBlock, GridSetBlock, GridValue } from "./GridBlock";
 
 export type GridTableOptions = {
     name: string;
@@ -49,7 +50,8 @@ const coalesce = (refs: readonly RecordRef[]): Span[] => {
 
 
 
-export class GridRecordStore<const Tables extends readonly RecordTable<any, RecordSchema>[]> {
+export class GridRecordStore<const Tables extends readonly RecordTable<any, RecordSchema>[]> implements RecordStore<Tables> {
+
     readonly tables: Tables;
 
     readonly #provider: GridProvider;
@@ -78,6 +80,7 @@ export class GridRecordStore<const Tables extends readonly RecordTable<any, Reco
     }
 
 
+    // Read
     #locate(table: RecordTable, refs?: readonly RecordRef[]): GridRange[] {
         const { name, offset } = this.#options.get(table)!;
 
@@ -206,6 +209,159 @@ export class GridRecordStore<const Tables extends readonly RecordTable<any, Reco
         }
 
         return results as RecordReadResults<Reads>;
+    }
+
+
+    // Write
+    #encodeRow<Table extends Tables[number]>(table: Table, data: RecordTableData<Table> | RecordTablePatch<Table>): GridValue[] {
+        const values: GridValue[] = [];
+        const record = data as Record<string, any>;
+
+        for (const element of table.schema) {
+            if (RecordElement.isGroup(element)) {
+                const group = record[element.name];
+
+                for (const field of element.fields) {
+                    const value = group === null ? null : group?.[field.name];
+                    values.push(value === undefined ? undefined : field.encode(value));
+                }
+            }
+            else {
+                const value = record[element.name];
+                values.push(value === undefined ? undefined : element.encode(value));
+            }
+        }
+
+        return values;
+    }
+
+    #addBlock<Table extends Tables[number]>(
+        table: Table,
+        data: RecordTableData<Table> | readonly RecordTableData<Table>[]
+    ): GridSetBlock {
+        const { name } = this.#options.get(table)!;
+        const records = toArray(data);
+
+        return GridBlock.range(name, records.map(record => this.#encodeRow(table, record)));
+    }
+
+    #updateBlock<Table extends Tables[number]>(
+        table: Table,
+        patch: RecordTablePatch<Table>
+    ): GridSetBlock {
+        const { name, offset } = this.#options.get(table)!;
+
+        return GridBlock.row(
+            name,
+            { col: 0, row: offset + Number(patch.$ref) },
+            this.#encodeRow(table, patch)
+        );
+    }
+
+    async write<const Writes extends readonly RecordWriteOperation<Tables[number]>[]>
+        (writes: Writes): Promise<RecordWriteResults<Writes>> {
+
+        // 1. Convert write operations into grid requests        
+        const requestsByWrite: GridSetRequest[][] = writes.map(write => {
+            if (write.type === 'add') {
+                return [{
+                    block: this.#addBlock(write.table, write.data),
+                    returns: write.returns
+                }];
+            }
+            else {
+                const patches = toArray(write.patches);
+
+                return patches.map(patch => ({
+                    block: this.#updateBlock(write.table, patch),
+                    returns: write.returns === RecordReturn.Ref
+                        ? undefined
+                        : write.returns
+                }));
+            }
+        });
+
+        const requests = requestsByWrite.flat();
+
+
+        // 2. Execute all requests through GridProvider        
+        const gridResults = requests.length
+            ? await this.#provider.set(requests)
+            : [];
+
+        // 3. Convert grid results into record results
+        const results: unknown[] = [];
+        let resultIndex = 0;
+
+        for (let i = 0; i < writes.length; i++) {
+            const write = writes[i];
+
+            const writeResults = gridResults.slice(
+                resultIndex,
+                resultIndex + requestsByWrite[i].length
+            );
+
+            resultIndex += requestsByWrite[i].length;
+
+            // Add
+            if (write.type === 'add') {
+                const result = writeResults[0];
+                const { offset } = this.#options.get(write.table)!;
+                const length = toLength(write.data);
+                const many = isArray(write.data);
+
+                if (write.returns === RecordReturn.Data) {
+                    const block = result as GridFetchBlock;
+
+                    const entries = block.rows.map((row, index) =>
+                        this.#parseRow(write.table, row, block.start!.row + index - offset)
+                    );
+
+                    results.push(many ? entries : entries[0]);
+                }
+                else if (write.returns === RecordReturn.Ref) {
+                    const start = result as GridCoordinate;
+
+                    const refs = Array.from(
+                        { length },
+                        (_, index) => start.row + index - offset
+                    );
+
+                    results.push(many ? refs : refs[0]);
+                }
+                else
+                    results.push(undefined);
+            }
+
+            // Update
+            else {
+                const patches = toArray(write.patches);
+                const many = isArray(write.patches);
+
+                if (write.returns === RecordReturn.Data) {
+                    const { offset } = this.#options.get(write.table)!;
+
+                    const entries = (writeResults as GridFetchBlock[]).map(block =>
+                        this.#parseRow(write.table, block.rows[0], block.start!.row - offset)
+                    );
+
+                    results.push(many ? entries : entries[0]);
+                }
+                else if (write.returns === RecordReturn.Ref) {
+                    const refs = patches.map(patch => patch.$ref);
+
+                    results.push(many ? refs : refs[0]);
+                }
+                else
+                    results.push(undefined);
+            }
+        }
+
+        return results as RecordWriteResults<Writes>;
+    }
+
+    invalidate(): void {
+        this.#provider.invalidate();
     }
 }
 

@@ -10,6 +10,7 @@ export interface RecordWriter<Tables extends readonly RecordTable<any, RecordSch
     write<const Writes extends readonly RecordWriteOperation<Tables[number]>[]>(writes: Writes): Promise<RecordWriteResults<Writes>>;
 }
 
+// TODO: Examine simply Read/Write architecture or develop easy helpers (beyond util) for mapping into array and back
 export interface RecordStore<Tables extends readonly RecordTable<any, RecordSchema>[]>
     extends RecordReader<Tables>, RecordWriter<Tables> {
 

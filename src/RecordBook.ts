@@ -195,12 +195,11 @@ export class RecordBook<const Tables extends readonly RecordTable[]>
 
                 // Add
                 if (write.type === 'add') {
+                    if (isArray(write.data) && write.data.length === 0)
+                        continue;
+
                     if (write.returns === RecordReturn.Data) {
-                        const entries = (
-                            Array.isArray(result)
-                                ? result
-                                : [result]
-                        ) as RecordTableEntry<typeof write.table>[];
+                        const entries = (Array.isArray(result) ? result : [result]) as RecordTableEntry<typeof write.table>[];
 
                         cache.set(entries);
                     }
