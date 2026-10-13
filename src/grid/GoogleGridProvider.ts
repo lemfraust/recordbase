@@ -4,6 +4,7 @@ import { ExecutorHandler, retryHandler } from "../Executor";
 import { GridRange } from "./GridAddress";
 import { GridFetchBlock } from "./GridBlock";
 import { GridProvider, GridSetRequest, GridSetResults } from "./GridProvider";
+import { lazy, Lazy, Resolvable } from "../util/Lazy";
 
 export type GoogleApi = sheets_v4.Sheets;
 
@@ -11,7 +12,7 @@ export type GoogleApi = sheets_v4.Sheets;
 
 export type GoogleGridProviderOptions = {
     id: string;
-    api: GoogleApi;
+    api: Resolvable<GoogleApi>;
     handlers?: ExecutorHandler | GoogleGridProviderHandlerOptions;
 };
 
@@ -47,15 +48,15 @@ const resolveHandlers = (handlers: GoogleGridProviderOptions['handlers']): Googl
 
 export class GoogleGridProvider implements GridProvider {
     readonly #id: string;
-    readonly #api: GoogleApi;
-    readonly #handler?: ExecutorHandler;
+    readonly #api: Lazy<GoogleApi>;
+    readonly #handlers: GoogleGridProviderHandlers;
 
     #sheetIds?: Map<string, number>;
 
-    constructor(id: string, api: GoogleApi, handler?: ExecutorHandler) {
-        this.#id = id;
-        this.#api = api;
-        this.#handler = handler;
+    constructor(options: GoogleGridProviderOptions) {
+        this.#id = options.id;
+        this.#api = lazy(options.api);
+        this.#handlers = resolveHandlers(options.handlers);
     }
 
     async fetch(ranges: readonly GridRange[]): Promise<GridFetchBlock[]> {
