@@ -92,7 +92,7 @@ const enumParser = <const Enum extends readonly string[]>(values: Enum, caseSens
     };
 };
 
-const enumField = <const Name extends string, const Enum extends readonly string[]>(name: Name, values: Enum, caseSensitive: boolean = false) => {
+export const enumField = <const Name extends string, const Enum extends readonly string[]>(name: Name, values: Enum, caseSensitive: boolean = false) => {
     const parser = enumParser(values, caseSensitive);
 
     return new RecordFieldBuilder(name, false, parser, parser, value => value);

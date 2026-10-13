@@ -13,6 +13,15 @@ export type GridTableOptions = {
     offset: number;
 };
 
+export type GridTablesOf<Sources extends readonly GridTableSource<RecordTable>[]> = {
+    [Index in keyof Sources]:
+        Sources[Index] extends RecordTable
+            ? Sources[Index]
+            : Sources[Index] extends readonly [infer Table extends RecordTable, unknown]
+                ? Table
+                : never;
+};
+
 export type GridTableSource<Table extends RecordTable<any, RecordSchema>> =
     | Table
     | readonly [Table, Partial<GridTableOptions>];
@@ -260,7 +269,7 @@ export class GridRecordStore<const Tables extends readonly RecordTable<any, Reco
     async write<const Writes extends readonly RecordWriteOperation<Tables[number]>[]>
         (writes: Writes): Promise<RecordWriteResults<Writes>> {
 
-        // 1. Convert write operations into grid requests        
+        // 1. Convert write operations into grid requests
         const requestsByWrite: GridWriteRequest[][] = writes.map(write => {
             if (write.type === 'add') {
                 return [{
@@ -283,7 +292,7 @@ export class GridRecordStore<const Tables extends readonly RecordTable<any, Reco
         const requests = requestsByWrite.flat();
 
 
-        // 2. Execute all requests through GridProvider        
+        // 2. Execute all requests through GridProvider
         const gridResults = requests.length
             ? await this.#provider.write(requests)
             : [];
