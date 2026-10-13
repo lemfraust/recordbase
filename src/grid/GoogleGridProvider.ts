@@ -1,8 +1,8 @@
 import { sheets_v4 } from "@googleapis/sheets";
 
 import { execute, ExecutorHandler, lazy, Lazy, Resolvable, retryHandler } from "../util";
-import { GridAddress, GridRange } from "./GridAddress";
-import { GridFetchBlock } from "./GridBlock";
+import { GridAddress, GridCoordinate, GridRange } from "./GridAddress";
+import { GridBlock, GridFetchBlock, GridSetBlock, GridValue } from "./GridBlock";
 import { GridProvider, GridSetRequest, GridSetResults } from "./GridProvider";
 
 export type GoogleApi = sheets_v4.Sheets;
@@ -42,15 +42,40 @@ const resolveHandlers = (handlers: GoogleGridProviderOptions['handlers']): Googl
     return { fetch: resolve('fetch'), set: resolve('set'), info: resolve('info') };
 };
 
+// Google Specific Helpers
 const encodeGridName = (name: string): string => `'${name.replaceAll("'", "''")}'`;
 
+const dateToSerialNumber = (date: Date): number => {
+    const epoch = new Date(1899, 11, 30);
+    return (date.getTime() - epoch.getTime()) / 86400000;
+};
 
+const toGoogleCellValue = (value: GridValue): sheets_v4.Schema$ExtendedValue | undefined => {
+    if (typeof value === 'string')
+        return { stringValue: value };
+    else if (typeof value === 'number')
+        return { numberValue: value };
+    else if (typeof value === 'boolean')
+        return { boolValue: value };
+    else if (value instanceof Date)
+        return { numberValue: dateToSerialNumber(value) };
+    else if (value === null)
+        return { stringValue: '' };
+    else if (value === undefined)
+        return undefined;
+    else
+        return { formulaValue: value.formula.startsWith('=') ? value.formula : `=${value.formula}` };
+};
+
+
+// GoogleGridProvider
 export class GoogleGridProvider implements GridProvider {
     readonly #id: string;
     readonly #api: Lazy<GoogleApi>;
     readonly #handlers: GoogleGridProviderHandlers;
 
-    #sheetIds?: Map<string, number>;
+    #sheetIds?: Lazy<Map<string, number>>;
+
 
     constructor(options: GoogleGridProviderOptions) {
         this.#id = options.id;
@@ -85,15 +110,33 @@ export class GoogleGridProvider implements GridProvider {
         }));
     }
 
+    async #loadSheetIds(): Promise<Map<string, number>> {
+        const cache = this.#sheetIds ??= lazy(async () => {
+            const api = await this.#api;
+
+            const response = await execute(() => api.spreadsheets.get({
+                spreadsheetId: this.#id,
+                fields: "sheets(properties(sheetId,title))"
+            }), this.#handlers.info);
+
+            const ids = new Map<string, number>();
+
+            for (const sheet of response.data.sheets ?? []) {
+                const properties = sheet.properties;
+
+                if (properties?.title != null && properties.sheetId != null)
+                    ids.set(properties.title, properties.sheetId);
+            }
+
+            return ids;
+        });
+
+        return await cache;
+    }    
+
     async set<const Requests extends readonly GridSetRequest[]>(
         requests: Requests
-    ): Promise<GridSetResults<Requests>> {
-
-        // 1. translate grid names to Google sheet IDs
-        // 2. translate GridSetBlocks into Google requests
-        // 3. executee batches with executor
-        // 4. resolve results as Ref/Data/undefined
-
+    ): Promise<GridSetResults<Requests>> {        
         throw new Error("Not implemented");
     }
 
