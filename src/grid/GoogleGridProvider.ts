@@ -2,8 +2,8 @@ import { sheets_v4 } from "@googleapis/sheets";
 
 import { execute, ExecutorHandler, lazy, Lazy, Resolvable, retryHandler } from "../util";
 import { GridAddress, GridCoordinate, GridRange } from "./GridAddress";
-import { GridBlock, GridFetchBlock, GridSetBlock, GridValue } from "./GridBlock";
-import { GridProvider, GridSetRequest, GridSetResults } from "./GridProvider";
+import { GridBlock, GridReadBlock, GridWriteBlock, GridValue } from "./GridBlock";
+import { GridProvider, GridWriteRequest, GridWriteResults } from "./GridProvider";
 
 export type GoogleApi = sheets_v4.Sheets;
 
@@ -15,8 +15,8 @@ export type GoogleGridProviderOptions = {
 
 export type GoogleGridProviderHandlerOptions = {
     default?: ExecutorHandler;
-    fetch?: ExecutorHandler;
-    set?: ExecutorHandler;
+    read?: ExecutorHandler;
+    write?: ExecutorHandler;
     info?: ExecutorHandler;
 };
 
@@ -27,19 +27,19 @@ const noRetry: ExecutorHandler = () => undefined;
 const retry = retryHandler({ attempts: 3, wait: 1000 });
 
 const defaultHandlers: GoogleGridProviderHandlers = {
-    fetch: retry,
-    set: noRetry,
+    read: retry,
+    write: noRetry,
     info: retry
 };
 
 const resolveHandlers = (handlers: GoogleGridProviderOptions['handlers']): GoogleGridProviderHandlers => {
     if (typeof handlers === 'function')
-        return { fetch: handlers, set: handlers, info: handlers };
+        return { read: handlers, write: handlers, info: handlers };
 
     const resolve = (key: keyof GoogleGridProviderHandlers): ExecutorHandler =>
         handlers?.[key] ?? handlers?.default ?? defaultHandlers[key];
 
-    return { fetch: resolve('fetch'), set: resolve('set'), info: resolve('info') };
+    return { read: resolve('read'), write: resolve('write'), info: resolve('info') };
 };
 
 // Google Specific Helpers
@@ -84,7 +84,7 @@ export class GoogleGridProvider implements GridProvider {
     }
 
 
-    async fetch(ranges: readonly GridRange[]): Promise<GridFetchBlock[]> {
+    async read(ranges: readonly GridRange[]): Promise<GridReadBlock[]> {
         if (!ranges.length) return [];
 
         // translate ranges into A1 notation
@@ -98,9 +98,9 @@ export class GoogleGridProvider implements GridProvider {
             ranges: a1Ranges,
             majorDimension: "ROWS",
             valueRenderOption: "FORMATTED_VALUE"
-        }), this.#handlers.fetch);
+        }), this.#handlers.read);
 
-        // translate results into GridFetchBlocks
+        // translate results into GridReadBlocks
         const values = response.data.valueRanges ?? [];
 
         return ranges.map((range, index) => ({
@@ -134,9 +134,9 @@ export class GoogleGridProvider implements GridProvider {
         return await cache;
     }    
 
-    async set<const Requests extends readonly GridSetRequest[]>(
+    async write<const Requests extends readonly GridWriteRequest[]>(
         requests: Requests
-    ): Promise<GridSetResults<Requests>> {        
+    ): Promise<GridWriteResults<Requests>> {        
         throw new Error("Not implemented");
     }
 

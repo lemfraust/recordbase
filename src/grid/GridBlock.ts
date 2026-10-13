@@ -4,9 +4,9 @@ export type GridValue = string | number | boolean | Date | { formula: string; } 
 
 export type GridBlock<T> = { grid: string; start: GridCoordinate | undefined, rows: T[][]; };
 
-export type GridFetchBlock = GridBlock<string>;
+export type GridReadBlock = GridBlock<string>;
 
-export type GridSetBlock = GridBlock<GridValue>;
+export type GridWriteBlock = GridBlock<GridValue>;
 
 function GridColumnBlock<T>(grid: string, values: T[]): GridBlock<T>;
 function GridColumnBlock<T>(grid: string, start: GridCoordinate | undefined, values: T[]): GridBlock<T>;

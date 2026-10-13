@@ -1,33 +1,33 @@
 import { RecordReturn, RecordReturnData, RecordReturnRef } from "../RecordOperations";
 import { GridCoordinate, GridRange } from "./GridAddress";
-import { GridFetchBlock, GridSetBlock } from "./GridBlock";
+import { GridReadBlock, GridWriteBlock } from "./GridBlock";
 
-export type GridSetRequest<Returns extends RecordReturn = RecordReturn> = {
-    block: GridSetBlock;
+export type GridWriteRequest<Returns extends RecordReturn = RecordReturn> = {
+    block: GridWriteBlock;
     returns: Returns;
 };
 
-export type GridSetResult<Returns extends RecordReturn> =
+export type GridWriteResult<Returns extends RecordReturn> =
     Returns extends RecordReturnData
-        ? GridFetchBlock
+        ? GridReadBlock
         : Returns extends RecordReturnRef
             ? GridCoordinate
             : undefined;
 
-export type GridSetResults<    Requests extends readonly GridSetRequest[]> = {
+export type GridWriteResults<Requests extends readonly GridWriteRequest[]> = {
         [Index in keyof Requests]:
-            Requests[Index] extends GridSetRequest<infer Returns>
-                ? GridSetResult<Returns>
+            Requests[Index] extends GridWriteRequest<infer Returns>
+                ? GridWriteResult<Returns>
                 : never;
     };
 
 /* Provider */
 export interface GridProvider {
-    fetch(ranges: readonly GridRange[]): Promise<GridFetchBlock[]>;
+    read(ranges: readonly GridRange[]): Promise<GridReadBlock[]>;
 
-    set<const Requests extends readonly GridSetRequest[]>
+    write<const Requests extends readonly GridWriteRequest[]>
         (requests: Requests)
-        : Promise<GridSetResults<Requests>>;
+        : Promise<GridWriteResults<Requests>>;
 
     invalidate(): void;
 };

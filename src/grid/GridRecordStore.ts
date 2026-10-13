@@ -1,13 +1,13 @@
 import { RecordTable, RecordTableData, RecordTableEntry, RecordTablePatch } from "../RecordTable";
 import { RecordElement, RecordSchema } from "../RecordSchema";
 import { RecordStore } from "../RecordStore";
-import { GridProvider, GridSetRequest } from "./GridProvider";
+import { GridProvider, GridWriteRequest } from "./GridProvider";
 import { freeze, isArray, toArray, toLength } from "../util";
 import { RecordRef } from "../RecordShapes";
 import { GridAddress, GridCoordinate, GridRange } from "./GridAddress";
 import { RecordReadOperation, RecordReadResults, RecordReturn, RecordWriteOperation, RecordWriteResults } from "../RecordOperations";
 import { Result } from "../Result";
-import { GridBlock, GridFetchBlock, GridSetBlock, GridValue } from "./GridBlock";
+import { GridBlock, GridReadBlock, GridWriteBlock, GridValue } from "./GridBlock";
 
 export type GridTableOptions = {
     name: string;
@@ -160,11 +160,11 @@ export class GridRecordStore<const Tables extends readonly RecordTable<any, Reco
                 return this.#locate(read.table, read.items.refs);
         });
 
-        // Fetch all ranges in one batch
+        // Read all ranges in one batch
         const ranges = rangesByRead.flat();
 
         const blocks = ranges.length
-            ? await this.#provider.fetch(ranges)
+            ? await this.#provider.read(ranges)
             : [];
 
         const results: unknown[] = [];
@@ -238,7 +238,7 @@ export class GridRecordStore<const Tables extends readonly RecordTable<any, Reco
     #addBlock<Table extends Tables[number]>(
         table: Table,
         data: RecordTableData<Table> | readonly RecordTableData<Table>[]
-    ): GridSetBlock {
+    ): GridWriteBlock {
         const { name } = this.#options.get(table)!;
         const records = toArray(data);
 
@@ -248,7 +248,7 @@ export class GridRecordStore<const Tables extends readonly RecordTable<any, Reco
     #updateBlock<Table extends Tables[number]>(
         table: Table,
         patch: RecordTablePatch<Table>
-    ): GridSetBlock {
+    ): GridWriteBlock {
         const { name, offset } = this.#options.get(table)!;
 
         return GridBlock.row(
@@ -262,7 +262,7 @@ export class GridRecordStore<const Tables extends readonly RecordTable<any, Reco
         (writes: Writes): Promise<RecordWriteResults<Writes>> {
 
         // 1. Convert write operations into grid requests        
-        const requestsByWrite: GridSetRequest[][] = writes.map(write => {
+        const requestsByWrite: GridWriteRequest[][] = writes.map(write => {
             if (write.type === 'add') {
                 return [{
                     block: this.#addBlock(write.table, write.data),
@@ -286,7 +286,7 @@ export class GridRecordStore<const Tables extends readonly RecordTable<any, Reco
 
         // 2. Execute all requests through GridProvider        
         const gridResults = requests.length
-            ? await this.#provider.set(requests)
+            ? await this.#provider.write(requests)
             : [];
 
         // 3. Convert grid results into record results
@@ -311,7 +311,7 @@ export class GridRecordStore<const Tables extends readonly RecordTable<any, Reco
                 const many = isArray(write.data);
 
                 if (write.returns === RecordReturn.Data) {
-                    const block = result as GridFetchBlock;
+                    const block = result as GridReadBlock;
 
                     const entries = block.rows.map((row, index) =>
                         this.#parseRow(write.table, row, block.start!.row + index - offset)
@@ -341,7 +341,7 @@ export class GridRecordStore<const Tables extends readonly RecordTable<any, Reco
                 if (write.returns === RecordReturn.Data) {
                     const { offset } = this.#options.get(write.table)!;
 
-                    const entries = (writeResults as GridFetchBlock[]).map(block =>
+                    const entries = (writeResults as GridReadBlock[]).map(block =>
                         this.#parseRow(write.table, block.rows[0], block.start!.row - offset)
                     );
 
