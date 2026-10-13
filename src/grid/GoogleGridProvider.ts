@@ -1,14 +1,11 @@
 import { sheets_v4 } from "@googleapis/sheets";
 
-import { ExecutorHandler, retryHandler } from "../Executor";
-import { GridRange } from "./GridAddress";
+import { execute, ExecutorHandler, lazy, Lazy, Resolvable, retryHandler } from "../util";
+import { GridAddress, GridRange } from "./GridAddress";
 import { GridFetchBlock } from "./GridBlock";
 import { GridProvider, GridSetRequest, GridSetResults } from "./GridProvider";
-import { lazy, Lazy, Resolvable } from "../util/Lazy";
 
 export type GoogleApi = sheets_v4.Sheets;
-
-
 
 export type GoogleGridProviderOptions = {
     id: string;
@@ -45,6 +42,8 @@ const resolveHandlers = (handlers: GoogleGridProviderOptions['handlers']): Googl
     return { fetch: resolve('fetch'), set: resolve('set'), info: resolve('info') };
 };
 
+const encodeGridName = (name: string): string => `'${name.replaceAll("'", "''")}'`;
+
 
 export class GoogleGridProvider implements GridProvider {
     readonly #id: string;
@@ -59,13 +58,31 @@ export class GoogleGridProvider implements GridProvider {
         this.#handlers = resolveHandlers(options.handlers);
     }
 
+
     async fetch(ranges: readonly GridRange[]): Promise<GridFetchBlock[]> {
+        if (!ranges.length) return [];
 
-        // 1. translate ranges into Google A1 notation
-        // 2. execute batchGet with executor
-        // 3. tralsate results into GridFetchBlocks
+        // translate ranges into A1 notation
+        const a1Ranges = ranges.map(range => GridAddress.toA1(range, encodeGridName));
 
-        throw new Error("Not implemented");
+        // execute batchGet
+        const api = await this.#api;
+
+        const response = await execute(() => api.spreadsheets.values.batchGet({
+            spreadsheetId: this.#id,
+            ranges: a1Ranges,
+            majorDimension: "ROWS",
+            valueRenderOption: "FORMATTED_VALUE"
+        }), this.#handlers.fetch);
+
+        // translate results into GridFetchBlocks
+        const values = response.data.valueRanges ?? [];
+
+        return ranges.map((range, index) => ({
+            grid: range.grid,
+            start: range.from,
+            rows: (values[index]?.values ?? []) as string[][]
+        }));
     }
 
     async set<const Requests extends readonly GridSetRequest[]>(
