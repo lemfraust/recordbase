@@ -1,4 +1,5 @@
-export const greet = (name: string = 'World'): string => `Hello, ${name}.`;
+export * from './record';
+export * from './util';
+export * from './grid';
 
-if (require.main === module)
-    console.log(greet());
+export * as rb from './helpers';

@@ -1,6 +1,5 @@
 import { RecordGroupData } from "./RecordShapes";
-import { Result } from "./util/Result";
-import { freeze } from "./util";
+import { freeze, Result } from "../util";
 
 /* Value */
 export type RecordValue = string | number | boolean | Date | { formula: string; } | null | undefined;

@@ -1,28 +1,12 @@
-import { RecordBook } from "./RecordBook";
-import { RecordField, RecordFieldBuilder, RecordGroupBuilder, RecordParser, RecordProcessor, RecordSchema } from "./RecordSchema";
-import { RecordStore } from "./RecordStore";
-import { RecordTable } from "./RecordTable";
-import { Result } from "./util/Result";
-
-const book = <const Tables extends readonly RecordTable<any, RecordSchema>[]>(
-    store: RecordStore<Tables>
-) => new RecordBook(store);
-
-const table = <const Name extends string, const Schema extends RecordSchema>(name: Name, schema: Schema) =>
-    new RecordTable(name, schema);
-
-const group = <const Fields extends RecordField<any, any, any>[]>(fields: Fields) => <const Name extends string>(name: Name) =>
-    new RecordGroupBuilder(name, false, fields);
-
-const field = <const Name extends string, Type>(name: Name, processor: RecordProcessor<Type>) =>
-    new RecordFieldBuilder(name, false, processor.validate, processor.parse, processor.encode);
+import { RecordFieldBuilder, RecordParser, RecordProcessor } from "./RecordSchema";
+import { Result } from "../util";
 
 
 const expected = (received: any, ...expected: string[]) =>
     Result.failure(`Expected ${expected.length === 1 ? expected[0] : expected.join('|')}, but received '${received}'`);
 
 
-const booleanField = <const Name extends string>(name: Name, processor?: Partial<RecordProcessor<boolean>>) =>
+export const booleanField = <const Name extends string>(name: Name, processor?: Partial<RecordProcessor<boolean>>) =>
     new RecordFieldBuilder(
         name,
         false,
@@ -32,7 +16,7 @@ const booleanField = <const Name extends string>(name: Name, processor?: Partial
     );
 
 
-const numberField = <const Name extends string>(name: Name, processor?: Partial<RecordProcessor<number>>) =>
+export const numberField = <const Name extends string>(name: Name, processor?: Partial<RecordProcessor<number>>) =>
     new RecordFieldBuilder(
         name,
         false,
@@ -48,7 +32,7 @@ const numberField = <const Name extends string>(name: Name, processor?: Partial<
     );
 
 
-const currencyField = <const Name extends string>(name: Name, processor?: Partial<RecordProcessor<number>>) =>
+export const currencyField = <const Name extends string>(name: Name, processor?: Partial<RecordProcessor<number>>) =>
     new RecordFieldBuilder(
         name,
         false,
@@ -64,7 +48,7 @@ const currencyField = <const Name extends string>(name: Name, processor?: Partia
     );
 
 
-const percentField = <const Name extends string>(name: Name, processor?: Partial<RecordProcessor<number>>) =>
+export const percentField = <const Name extends string>(name: Name, processor?: Partial<RecordProcessor<number>>) =>
     new RecordFieldBuilder(
         name,
         false,
@@ -81,7 +65,7 @@ const percentField = <const Name extends string>(name: Name, processor?: Partial
     );
 
 
-const stringField = <const Name extends string>(name: Name, processor?: Partial<RecordProcessor<string>>) =>
+export const stringField = <const Name extends string>(name: Name, processor?: Partial<RecordProcessor<string>>) =>
     new RecordFieldBuilder(
         name,
         false,
@@ -140,7 +124,7 @@ const phoneParser = (format?: PhoneFormatter) => (value: unknown) => {
         : expected(value, 'a phone number');
 };
 
-const phoneField = <const Name extends string>(name: Name, format?: PhoneFormatter) => {
+export const phoneField = <const Name extends string>(name: Name, format?: PhoneFormatter) => {
     const parser = phoneParser(format);
 
     return new RecordFieldBuilder(name, false, parser, parser, value => value);
@@ -155,7 +139,7 @@ const defaultDateParser: RecordParser<Date> = (value: string) => {
         : Result.success(parsed);
 };
 
-const dateField = <const Name extends string>(name: Name, parser?: RecordParser<Date>) =>
+export const dateField = <const Name extends string>(name: Name, parser?: RecordParser<Date>) =>
     new RecordFieldBuilder(
         name,
         false,
@@ -164,19 +148,3 @@ const dateField = <const Name extends string>(name: Name, parser?: RecordParser<
         value => value
     );
 
-
-export {
-    book,
-    table,
-    group,
-    field,
-    booleanField as boolean,
-    numberField as number,
-    currencyField as currency,
-    percentField as percent,
-    stringField as string,
-    enumField as enum,
-    phoneField as phone,
-    dateField as date,
-
-};

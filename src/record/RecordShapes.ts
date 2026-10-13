@@ -1,5 +1,5 @@
 import { RecordElement, RecordField, RecordGroup, RecordSchema } from "./RecordSchema";
-import { Simplify } from "./util";
+import { Simplify } from "../util";
 
 
 export type RecordRef = string | number;

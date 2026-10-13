@@ -1,13 +1,12 @@
-import { RecordTable, RecordTableData, RecordTableEntry, RecordTablePatch } from "../RecordTable";
-import { RecordElement, RecordSchema } from "../RecordSchema";
-import { RecordStore } from "../RecordStore";
-import { GridProvider, GridWriteRequest } from "./GridProvider";
-import { freeze, isArray, toArray, toLength } from "../util";
-import { RecordRef } from "../RecordShapes";
+import { RecordReadOperation, RecordReadResults, RecordReturn, RecordWriteOperation, RecordWriteResults } from "../record/RecordOperations";
+import { RecordElement, RecordSchema } from "../record/RecordSchema";
+import { RecordRef } from "../record/RecordShapes";
+import { RecordStore } from "../record/RecordStore";
+import { RecordTable, RecordTableData, RecordTableEntry, RecordTablePatch } from "../record/RecordTable";
+import { freeze, isArray, Result, toArray, toLength } from "../util";
 import { GridAddress, GridCoordinate, GridRange } from "./GridAddress";
-import { RecordReadOperation, RecordReadResults, RecordReturn, RecordWriteOperation, RecordWriteResults } from "../RecordOperations";
-import { Result } from "../util/Result";
-import { GridBlock, GridReadBlock, GridWriteBlock, GridValue } from "./GridBlock";
+import { GridBlock, GridReadBlock, GridValue, GridWriteBlock } from "./GridBlock";
+import { GridProvider, GridWriteRequest } from "./GridProvider";
 
 export type GridTableOptions = {
     name: string;

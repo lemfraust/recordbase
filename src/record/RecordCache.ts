@@ -1,6 +1,6 @@
 import { RecordEntry, RecordRef } from "./RecordShapes";
 import { RecordSchema } from "./RecordSchema";
-import { isArray } from "./util";
+import { isArray } from "../util";
 
 export interface RecordCache<Schema extends RecordSchema = RecordSchema> {
     readonly auto: boolean;

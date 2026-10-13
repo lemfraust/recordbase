@@ -1,4 +1,4 @@
-import { RecordReturn, RecordReturnData, RecordReturnRef } from "../RecordOperations";
+import { RecordReturn, RecordReturnData, RecordReturnRef } from "../record/RecordOperations";
 import { GridCoordinate, GridRange } from "./GridAddress";
 import { GridReadBlock, GridWriteBlock } from "./GridBlock";
 

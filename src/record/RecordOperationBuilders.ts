@@ -6,7 +6,7 @@ import {
 import { RecordRef } from "./RecordShapes";
 import { RecordReader, RecordWriter } from "./RecordStore";
 import { RecordTable, RecordTableData, RecordTableEntry, RecordTablePatch } from "./RecordTable";
-import { Append, freeze } from "./util";
+import { Append, freeze } from "../util";
 
 /* Returns */
 type RecordBuilderResult<Results extends readonly unknown[]> =
