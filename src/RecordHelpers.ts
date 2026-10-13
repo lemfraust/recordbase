@@ -166,5 +166,17 @@ const dateField = <const Name extends string>(name: Name, parser?: RecordParser<
 
 
 export {
-    book, booleanField as boolean, currencyField as currency, dateField as date, enumField as enum, field, group, numberField as number, percentField as percent, phoneField as phone, stringField as string, table
+    book,
+    table,
+    group,
+    field,
+    booleanField as boolean,
+    numberField as number,
+    currencyField as currency,
+    percentField as percent,
+    stringField as string,
+    enumField as enum,
+    phoneField as phone,
+    dateField as date,
+
 };
