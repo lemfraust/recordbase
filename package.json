@@ -1,38 +1,19 @@
 {
   "name": "recordbase",
-  "version": "0.0.0",
-  "description": "",
-  "main": "./dist/index.js",
-  "scripts": {
-    "clean": "rm -rf dist",
-    "build": "npm run clean && tsc",
-    "typecheck": "tsc --noEmit",
-    "watch": "tsx watch src/index.ts",
-    "prepack": "npm run build",
-    "test": "vitest run",
-    "test:watch": "vitest"
-  },
+  "description": "Typed Record Tables over Spreadsheets, JSON, SQL or other storage backends.",
+  "author": "lemfraust",
+  "version": "0.1.0",
   "repository": {
     "type": "git",
     "url": "git@github.com:lemfraust/recordbase.git"
   },
   "keywords": [],
-  "author": "",
   "license": "MIT",
   "type": "commonjs",
-  "private": true,
   "engines": {
     "node": ">=24 <25"
   },
-  "devDependencies": {
-    "@types/node": "^26.6.3",
-    "tsx": "^4.23.15",
-    "typescript": "~6.0.2",
-    "vitest": "^5.0.4"
-  },
-  "allowScripts": {
-    "esbuild@0.28.2": true
-  },
+  "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
@@ -45,5 +26,23 @@
   ],
   "dependencies": {
     "@googleapis/sheets": "^18.1.1"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.3",
+    "tsx": "^4.23.15",
+    "typescript": "~6.0.2",
+    "vitest": "^5.0.4"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true
+  },
+  "scripts": {
+    "clean": "rm -rf dist",
+    "build": "npm run clean && tsc",
+    "typecheck": "tsc --noEmit",
+    "watch": "tsx watch src/index.ts",
+    "prepack": "npm run build",
+    "test": "vitest run",
+    "test:watch": "vitest"
   }
 }
