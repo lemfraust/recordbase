@@ -1,8 +1,4 @@
-export type Promisable<T> = T | Promise<T>
-
-export type Thunkable<T> = T | (() => T);
-
-export type Resolvable<T> = Thunkable<Promisable<T>>
+import { Promisable, Resolvable } from "./types";
 
 export class Lazy<T> implements PromiseLike<T> {
     #source: () => Promisable<T>;

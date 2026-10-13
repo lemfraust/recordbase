@@ -2,7 +2,7 @@ import { RecordBook } from "./RecordBook";
 import { RecordField, RecordFieldBuilder, RecordGroupBuilder, RecordParser, RecordProcessor, RecordSchema } from "./RecordSchema";
 import { RecordStore } from "./RecordStore";
 import { RecordTable } from "./RecordTable";
-import { Result } from "./Result";
+import { Result } from "./util/Result";
 
 const book = <const Tables extends readonly RecordTable<any, RecordSchema>[]>(
     store: RecordStore<Tables>

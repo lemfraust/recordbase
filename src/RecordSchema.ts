@@ -1,5 +1,5 @@
 import { RecordGroupData } from "./RecordShapes";
-import { Result } from "./Result";
+import { Result } from "./util/Result";
 import { freeze } from "./util";
 
 /* Value */

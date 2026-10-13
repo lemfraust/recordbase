@@ -6,7 +6,7 @@ import { freeze, isArray, toArray, toLength } from "../util";
 import { RecordRef } from "../RecordShapes";
 import { GridAddress, GridCoordinate, GridRange } from "./GridAddress";
 import { RecordReadOperation, RecordReadResults, RecordReturn, RecordWriteOperation, RecordWriteResults } from "../RecordOperations";
-import { Result } from "../Result";
+import { Result } from "../util/Result";
 import { GridBlock, GridReadBlock, GridWriteBlock, GridValue } from "./GridBlock";
 
 export type GridTableOptions = {
