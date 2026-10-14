@@ -31,12 +31,13 @@ export const field = <const Name extends string, Type>(name: Name, processor: Re
 export {
     booleanField as boolean,
     numberField as number,
+    stringField as string,
+    dateField as date,
     currencyField as currency,
     percentField as percent,
-    stringField as string,
     enumField as enum,
+    emailField as email,
     phoneField as phone,
-    dateField as date
 } from '../record/RecordFields';
 
 export * as grid from './grid';
