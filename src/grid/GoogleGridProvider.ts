@@ -40,22 +40,26 @@ const toGoogleCellValue = (value: GridValue): GoogleCellValue | undefined => {
         return { formulaValue: value.formula.startsWith('=') ? value.formula : `=${value.formula}` };
 };
 
-const toGoogleAppendValue = (value: GridValue): string | number | boolean => {
-    if (value == null)
+const toGoogleAppendValue = (value: GridValue): string | number | boolean | null => {
+    if (value === undefined)
+        return null;
+    
+    else if (value === null)
         return '';
-
-    if (value instanceof Date)
+    
+    else if (value instanceof Date)
         return dateToSerialNumber(value);
-
-    if (typeof value === 'string')
+    
+    else if (typeof value === 'string')
         return value ? `'${value}` : '';
-
-    if (typeof value === 'object')
+    
+    else if (typeof value === 'object')
         return value.formula.startsWith('=')
             ? value.formula
             : `=${value.formula}`;
-
-    return value;
+            
+    else
+        return value;
 };
 
 const toGoogleWriteRequest = (sheetIds: ReadonlyMap<string, number>, block: GridWriteBlock): GoogleWriteRequest => {
