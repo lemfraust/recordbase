@@ -2,9 +2,40 @@ import { RecordFieldBuilder } from "./RecordSchema";
 import { Result } from "../util";
 
 
-/* Helper */
+/* Helpers */
 const expected = (received: any, ...expected: string[]) =>
     Result.failure(`Expected ${expected.length === 1 ? expected[0] : expected.join('|')}, but received '${received}'`);
+
+const numberPattern = /^[+-]?(?:(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i;
+
+const parseNumber = (value: string) => {
+    const text = value.trim();
+
+    if (!numberPattern.test(text))
+        return expected(value, 'a number');
+
+    const parsed = Number(text.replaceAll(',', ''));
+
+    return Number.isFinite(parsed)
+        ? Result.success(parsed)
+        : expected(value, 'a number');
+};
+
+
+const integerPattern = /^[+-]?(?:\d{1,3}(?:,\d{3})+|\d+)$/;
+
+const parseInteger = (value: string) => {
+    const text = value.trim();
+
+    if (!integerPattern.test(text))
+        return expected(value, 'a safe integer');
+
+    const parsed = Number(text.replaceAll(',', ''));
+
+    return Number.isSafeInteger(parsed)
+        ? Result.success(parsed)
+        : expected(value, 'a safe integer');
+};
 
 
 /* Primitive Fields */
@@ -21,15 +52,38 @@ export const numberField = <const Name extends string>(name: Name) =>
     new RecordFieldBuilder(
         name,
         false,
-        (value => typeof value === 'number' ? Result.success(value) : expected(value, 'a number')),
-        (value => {
-            const parsed = parseFloat(value.replaceAll(',', ''));
+        value => typeof value === 'number' && Number.isFinite(value)
+            ? Result.success(value)
+            : expected(value, 'a number'),
+        parseNumber,
+        value => value
+    );
 
-            return isNaN(parsed)
-                ? expected(value, 'a number')
-                : Result.success(parsed);
-        }),
-        (value => value)
+export const integerField = <const Name extends string>(name: Name) =>
+    new RecordFieldBuilder(
+        name,
+        false,
+        value => typeof value === 'number' && Number.isSafeInteger(value)
+            ? Result.success(value)
+            : expected(value, 'a safe integer'),
+        parseInteger,
+        value => value
+    );
+
+export const bigintField = <const Name extends string>(name: Name) =>
+    new RecordFieldBuilder(
+        name,
+        false,
+        value => typeof value === 'bigint'
+            ? Result.success(value)
+            : expected(value, 'a bigint'),
+        value => {
+            if (typeof value !== 'string' || !integerPattern.test(value.trim()))
+                return expected(value, 'a bigint');
+
+            return Result.success(BigInt(value.trim().replaceAll(',', '')));
+        },
+        value => value == null ? value : value.toString()
     );
 
 export const stringField = <const Name extends string>(name: Name) =>
