@@ -219,9 +219,11 @@ export const percentField = <const Name extends string>(name: Name) =>
 
 // Enum
 const enumParser = <const Enum extends readonly string[]>(values: Enum, caseSensitive: boolean) => {
+    const choices: readonly Enum[number][] = values;
+
     const find = caseSensitive
-        ? (value: string) => values.find(item => item === value)
-        : (value: string) => values.find(item => item.toLowerCase() === value.toLowerCase());
+        ? (value: string) => choices.find(item => item === value)
+        : (value: string) => choices.find(item => item.toLowerCase() === value.toLowerCase());
 
     return (value: unknown) => {
         if (typeof value !== 'string')
@@ -234,6 +236,7 @@ const enumParser = <const Enum extends readonly string[]>(values: Enum, caseSens
             : expected(value, ...values);
     };
 };
+
 export const enumField = <const Name extends string, const Enum extends readonly string[]>(name: Name, values: Enum, caseSensitive: boolean = false) => {
     const parser = enumParser(values, caseSensitive);
 
