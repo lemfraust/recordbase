@@ -34,7 +34,8 @@ type RecordPartialValue<Item extends RecordElement> =
     Item extends RecordField<any, infer Type, infer Optional>
         ? Optional extends true ? Type | null : Type
         : Item extends RecordGroup<any, infer Fields, infer Optional>
-            ? Optional extends true ? RecordGroupPartial<Fields> | null : RecordGroupPartial<Fields>
+            ? { [Key in keyof RecordGroupPartial<Fields>]: RecordGroupPartial<Fields>[Key] }
+              | (Optional extends true ? null : never)
             : never;
 
 type RecordPartialShape<Elements extends readonly RecordElement[]> = {
