@@ -2,6 +2,9 @@ import { DateTime } from 'luxon';
 
 import { RecordFieldBuilder } from "./RecordSchema";
 import { Result } from "../util";
+import isEmail, { IsEmailOptions } from 'validator/lib/isEmail';
+import isURL from 'validator/lib/isURL';
+import { IsURLOptions } from 'validator';
 
 
 /* Helpers */
@@ -239,20 +242,43 @@ export const enumField = <const Name extends string, const Enum extends readonly
 
 
 // Email
-const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+export type EmailOptions = IsEmailOptions;
 
-const emailParser = (value: unknown) =>
-    typeof value === 'string' && emailPattern.test(value)
-        ? Result.success(value)
-        : expected(value, 'an email address');
+const makeEmailParser = (options?: EmailOptions) =>
+    (value: unknown) =>
+        typeof value === 'string' && isEmail(value, options) ? Result.success(value) : expected(value, 'an email address');
 
-export const emailField = <const Name extends string>(name: Name) => new RecordFieldBuilder(
-    name,
-    false,
-    emailParser,
-    emailParser,
-    (value => value)
-);
+export const emailField = <const Name extends string>(name: Name, options?: EmailOptions) => {
+    const parser = makeEmailParser(options);
+
+    return new RecordFieldBuilder(
+        name,
+        false,
+        parser,
+        parser,
+        value => value
+    );
+};
+
+// Url
+export type UrlOptions = IsURLOptions;
+
+const makeUrlParser = (options?: UrlOptions) =>
+    (value: unknown) =>
+        typeof value === 'string' && isURL(value, options) ? Result.success(value) : expected(value, 'a Url');
+
+export const urlField = <const Name extends string>(name: Name, options?: UrlOptions) => {
+    const parser = makeUrlParser(options);
+
+    return new RecordFieldBuilder(
+        name,
+        false,
+        parser,
+        parser,
+        value => value
+    );
+};
+
 
 // Phone
 export type PhoneFormatter = (phone: { area: string, start: string, end: string; }) => string;
