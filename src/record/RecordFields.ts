@@ -165,34 +165,51 @@ export const currencyField = <const Name extends string>(name: Name) =>
     new RecordFieldBuilder(
         name,
         false,
-        (value => typeof value === 'number' ? Result.success(value) : expected(value, 'a number')),
-        (value => {
-            const parsed = parseFloat(value.replace('$', '').replaceAll(',', ''));
+        value => typeof value === 'number' && Number.isFinite(value)
+            ? Result.success(value)
+            : expected(value, 'a number'),
+        value => {
+            if (typeof value !== 'string')
+                return expected(value, 'a currency amount');
 
-            return isNaN(parsed)
-                ? expected(value, 'a number')
-                : Result.success(parsed);
-        }),
-        (value => value)
+            const text = value.trim();
+
+            // Allow an optional sign before the dollar symbol, never after it.
+            const match = /^([+-]?)\$([\d.,]+)$/.exec(text);
+
+            const result = parseNumber(match ? `${match[1]}${match[2]}` : text);
+
+            return result.success
+                ? result
+                : expected(value, 'a currency amount');
+        },
+        value => value
     );
-
 
 export const percentField = <const Name extends string>(name: Name) =>
     new RecordFieldBuilder(
         name,
         false,
-        (value => typeof value === 'number' ? Result.success(value) : expected(value, 'a number')),
-        (value => {
-            const hasPercent = value.endsWith('%');
-            const parsed = parseFloat(value.replace('%', '').replaceAll(',', ''));
+        value => typeof value === 'number' && Number.isFinite(value)
+            ? Result.success(value)
+            : expected(value, 'a number'),
+        value => {
+            if (typeof value !== 'string')
+                return expected(value, 'a percentage');
 
-            return isNaN(parsed)
-                ? expected(value, 'a number')
-                : Result.success(parsed / (hasPercent ? 100 : 1));
-        }),
-        (value => value)
+            const text = value.trim();
+
+            // Only allow a percent sign immediately after the number.
+            const match = /^([+-]?[\d.,]+)%$/.exec(text);
+
+            const result = parseNumber(match ? match[1] : text);
+
+            return result.success
+                ? Result.success(result.value / (match ? 100 : 1))
+                : expected(value, 'a percentage');
+        },
+        value => value
     );
-
 
 
 /* Specialized String Fields */
