@@ -158,11 +158,11 @@ export type RecordGroupFactory<
     Fields extends RecordField<any, any, any>[]
 > = (<const Name extends string>(
     name: Name
-) => RecordGroupBuilder<Name, Fields, false>) & {
+) => RecordGroupBuilder<Name, Fields, false>) & Iterable<Fields[number]> & {
+    readonly fields: Readonly<Fields>;
     readonly type: RecordGroupData<Fields>;
     readonly patch: RecordGroupPartial<Fields>;
 };
-
 
 export class RecordTable<
     const Name extends string = string,
