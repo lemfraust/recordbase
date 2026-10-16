@@ -33,6 +33,7 @@ export {
     numberField as number,
     stringField as string,
     dateField as date,
+    datetimeField as datetime,
     currencyField as currency,
     percentField as percent,
     enumField as enum,

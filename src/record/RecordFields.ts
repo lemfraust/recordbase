@@ -1,3 +1,5 @@
+import { DateTime } from 'luxon';
+
 import { RecordFieldBuilder } from "./RecordSchema";
 import { Result } from "../util";
 
@@ -95,6 +97,9 @@ export const stringField = <const Name extends string>(name: Name) =>
         (value => value)
     );
 
+/* Temporal Fields */
+
+// JS Date
 export const dateField = <const Name extends string>(name: Name) =>
     new RecordFieldBuilder(
         name,
@@ -106,6 +111,53 @@ export const dateField = <const Name extends string>(name: Name) =>
         },
         value => value
     );
+
+// Luxon DateTime
+export type DateTimeOptions = {
+    formats?: readonly string[];
+    locale?: string;
+    zone?: string;
+};
+
+const datetimeParser = ({ formats = [], locale = 'en-US', zone = 'UTC' }: DateTimeOptions) => (value: unknown) => {
+    if (typeof value !== 'string')
+        return expected(value, 'a date/time');
+
+    const iso = DateTime.fromISO(value, { zone, setZone: true });
+
+    if (iso.isValid)
+        return Result.success(iso);
+
+    for (const format of formats) {
+        const parsed = DateTime.fromFormat(value, format, {
+            locale,
+            zone,
+            setZone: true
+        });
+
+        if (parsed.isValid)
+            return Result.success(parsed);
+    }
+
+    return expected(value, 'a date/time');
+};
+
+export const datetimeField = <const Name extends string>(
+    name: Name,
+    options: DateTimeOptions = {}
+) => {
+    const parser = datetimeParser(options);
+
+    return new RecordFieldBuilder<Name, DateTime>(
+        name,
+        false,
+        value => DateTime.isDateTime(value) && value.isValid
+            ? Result.success(value)
+            : expected(value, 'a valid DateTime'),
+        parser,
+        value => value == null ? value : value.toISO({ extendedZone: true })
+    );
+};
 
 
 /* Specialized Number Fields */

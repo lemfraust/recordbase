@@ -25,9 +25,11 @@
     "dist"
   ],
   "dependencies": {
-    "@googleapis/sheets": "^18.1.1"
+    "@googleapis/sheets": "^18.1.1",
+    "luxon": "^3.7.2"
   },
   "devDependencies": {
+    "@types/luxon": "^3.7.6",
     "@types/node": "^26.6.3",
     "tsx": "^4.23.15",
     "typescript": "~6.0.2",
