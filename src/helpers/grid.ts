@@ -1,7 +1,7 @@
+import { GoogleGridProvider, GoogleGridProviderOptions } from '../grid/GoogleGridProvider';
 import { GridProvider } from '../grid/GridProvider';
 import { GridRecordStore, GridTablesOf, GridTableSource } from '../grid/GridRecordStore';
-import { GoogleGridProvider, GoogleGridProviderOptions } from '../grid/GoogleGridProvider';
-import { RecordTable } from '../record/RecordTable';
+import { RecordTable } from '../record/RecordSchema';
 
 export const google = (options: GoogleGridProviderOptions) =>
     new GoogleGridProvider(options);

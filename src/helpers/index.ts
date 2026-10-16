@@ -1,7 +1,6 @@
 import { RecordBook } from '../record/RecordBook';
-import { RecordField, RecordFieldBuilder, RecordGroupBuilder, RecordGroupFactory, RecordProcessor, RecordSchema, typeOnly } from '../record/RecordSchema';
+import { RecordField, RecordFieldBuilder, RecordGroupBuilder, RecordGroupFactory, RecordProcessor, RecordSchema, RecordTable, typeOnly } from '../record/RecordSchema';
 import { RecordStore } from '../record/RecordStore';
-import { RecordTable } from '../record/RecordTable';
 
 export const book = <const Tables extends readonly RecordTable<any, RecordSchema>[]>(store: RecordStore<Tables>) =>
     new RecordBook(store);
@@ -17,28 +16,20 @@ export function group(
     fields?: RecordField<any, any, any>[]
 ) {
     if (typeof nameOrFields === 'string')
-        return new RecordGroupBuilder(nameOrFields, false, fields!);
+        return new RecordGroupBuilder(nameOrFields, fields!, false);
 
     const factory = (name: string) =>
-        new RecordGroupBuilder(name, false, nameOrFields);
+        new RecordGroupBuilder(name, nameOrFields, false);
 
     return Object.defineProperty(factory, 'type', { get: typeOnly });
 }
 
 export const field = <const Name extends string, Type>(name: Name, processor: RecordProcessor<Type>) =>
-    new RecordFieldBuilder(name, false, processor.validate, processor.parse, processor.encode);
+    new RecordFieldBuilder(name, processor.validate, processor.parse, processor.encode, false);
 
 export {
-    booleanField as boolean,
-    numberField as number,
-    stringField as string,
-    dateField as date,
-    datetimeField as datetime,
-    currencyField as currency,
-    percentField as percent,
-    enumField as enum,
-    emailField as email,
-    phoneField as phone,
+    booleanField as boolean, currencyField as currency, dateField as date,
+    datetimeField as datetime, emailField as email, enumField as enum, numberField as number, percentField as percent, phoneField as phone, stringField as string
 } from '../record/RecordFields';
 
 export * as grid from './grid';

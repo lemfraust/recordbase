@@ -1,8 +1,7 @@
 import { RecordReadOperation, RecordReadResults, RecordReturn, RecordWriteOperation, RecordWriteResults } from "../record/RecordOperations";
-import { RecordElement, RecordSchema } from "../record/RecordSchema";
+import { RecordElement, RecordSchema, RecordTable, RecordTableData, RecordTableEntry, RecordTablePatch } from "../record/RecordSchema";
 import { RecordRef } from "../record/RecordShapes";
 import { RecordStore } from "../record/RecordStore";
-import { RecordTable, RecordTableData, RecordTableEntry, RecordTablePatch } from "../record/RecordTable";
 import { freeze, isArray, Result, toArray, toLength } from "../util";
 import { GridAddress, GridCoordinate, GridRange } from "./GridAddress";
 import { GridBlock, GridReadBlock, GridValue, GridWriteBlock } from "./GridBlock";

@@ -1,4 +1,4 @@
-import { RecordGroupData } from "./RecordShapes";
+import { RecordData, RecordEntry, RecordGroupData, RecordGroupPartial, RecordPatch } from "./RecordShapes";
 import { freeze, Result } from "../util";
 
 /* Value */
@@ -22,7 +22,7 @@ export type RecordProcessor<Type> = {
 export type RecordField<
     Name extends string = string,
     Type = any,
-    Optional extends boolean = boolean
+    Optional extends boolean = boolean,
 > = {
     name: Name;
     isOptional: Optional;
@@ -31,11 +31,11 @@ export type RecordField<
 export type RecordGroup<
     Name extends string = string,
     Fields extends RecordField[] = RecordField[],
-    Optional extends boolean = boolean
+    Optional extends boolean = boolean,
 > = {
     name: Name;
-    isOptional: Optional;
     fields: Fields;
+    isOptional: Optional;
 };
 
 export type RecordElement = RecordField | RecordGroup;
@@ -50,21 +50,21 @@ export const RecordElement = Object.freeze({
 
 export type RecordSchema = RecordElement[];
 
-/* Builders */
 
+/* Builders */
 export const typeOnly = (): never => { throw new Error('Type-only property cannot be accessed at runtime'); };
 
 export class RecordFieldBuilder<
     const Name extends string,
     const Type,
-    Optional extends boolean = false
+    Optional extends boolean = false,
 > implements RecordField<Name, Type, Optional> {
     constructor(
         public readonly name: Name,
-        public readonly isOptional: Optional,
         public readonly validate: RecordValidator<Type>,
         public readonly parse: RecordParser<Type>,
-        public readonly encode: RecordEncoder<Type>
+        public readonly encode: RecordEncoder<Type>,
+        public readonly isOptional: Optional,
     ) { freeze(this); }
 
     get type(): Type {
@@ -74,53 +74,63 @@ export class RecordFieldBuilder<
     optional(): RecordFieldBuilder<Name, Type, true> {
         return new RecordFieldBuilder(
             this.name,
-            true,
             this.validate,
             this.parse,
             this.encode,
+            true,
         );
     }
 
     validator(validator: RecordValidator<Type>): RecordFieldBuilder<Name, Type, Optional> {
         return new RecordFieldBuilder(
             this.name,
-            this.isOptional,
             validator,
             this.parse,
             this.encode,
+            this.isOptional,
         );
     }
 
     parser(parser: RecordParser<Type>): RecordFieldBuilder<Name, Type, Optional> {
         return new RecordFieldBuilder(
             this.name,
-            this.isOptional,
             this.validate,
             parser,
             this.encode,
+            this.isOptional,
         );
     }
 
     encoder(encoder: RecordEncoder<Type>): RecordFieldBuilder<Name, Type, Optional> {
         return new RecordFieldBuilder(
             this.name,
-            this.isOptional,
             this.validate,
             this.parse,
             encoder,
+            this.isOptional,
+        );
+    }
+
+    as<NewName extends string>(name: NewName): RecordFieldBuilder<NewName, Type, Optional> {
+        return new RecordFieldBuilder<NewName, Type, Optional>(
+            name,
+            this.validate,
+            this.parse,
+            this.encode,
+            this.isOptional,
         );
     }
 }
 
 export class RecordGroupBuilder<
     const Name extends string,
-    const Fields extends RecordField<any, any, any>[],
-    Optional extends boolean = false
+    const Fields extends RecordField<any, any, any>[] = [],
+    Optional extends boolean = false,
 > implements RecordGroup<Name, Fields, Optional> {
     constructor(
         public readonly name: Name,
+        public readonly fields: Fields,
         public readonly isOptional: Optional,
-        public readonly fields: Fields
     ) {
         this.fields = freeze([...fields]) as unknown as Fields;
         freeze(this);
@@ -130,8 +140,17 @@ export class RecordGroupBuilder<
         return typeOnly();
     }
 
+
+    get patch(): RecordGroupPartial<Fields> {
+        return typeOnly();
+    }
+
     optional(): RecordGroupBuilder<Name, Fields, true> {
-        return new RecordGroupBuilder(this.name, true, this.fields);
+        return new RecordGroupBuilder(this.name, this.fields, true);
+    }
+
+    as<NewName extends string>(name: NewName): RecordGroupBuilder<NewName, Fields, Optional> {
+        return new RecordGroupBuilder<NewName, Fields, Optional>(name, this.fields, this.isOptional);
     }
 }
 
@@ -140,5 +159,37 @@ export type RecordGroupFactory<
 > = (<const Name extends string>(
     name: Name
 ) => RecordGroupBuilder<Name, Fields, false>) & {
-    readonly type: RecordGroupBuilder<string, Fields, false>['type'];
+    readonly type: RecordGroupData<Fields>;
+    readonly patch: RecordGroupPartial<Fields>;
 };
+
+
+export class RecordTable<
+    const Name extends string = string,
+    const Schema extends RecordSchema = RecordSchema
+> {
+    constructor(
+        public readonly name: Name,
+        public readonly schema: Schema
+    ) { freeze(this); }
+
+    get type(): RecordData<Schema> {
+        return typeOnly();
+    }
+
+    get patch(): RecordPatch<Schema> {
+        return typeOnly();
+    }
+
+    as<NewName extends string>(name: NewName): RecordTable<NewName, Schema> {
+        return new RecordTable(name, this.schema);
+    }
+}
+
+export type RecordTableSchema<Table extends RecordTable> = Table['schema'];
+
+export type RecordTableData<Table extends RecordTable> = RecordData<Table['schema']>;
+
+export type RecordTableEntry<Table extends RecordTable> = RecordEntry<Table['schema']>;
+
+export type RecordTablePatch<Table extends RecordTable> = RecordPatch<Table['schema']>;

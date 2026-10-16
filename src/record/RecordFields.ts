@@ -47,38 +47,37 @@ const parseInteger = (value: string) => {
 export const booleanField = <const Name extends string>(name: Name) =>
     new RecordFieldBuilder(
         name,
-        false,
         (value => typeof value === 'boolean' ? Result.success(value) : expected(value, 'a boolean')),
         (value => value === 'TRUE' ? Result.success(true) : value === 'FALSE' ? Result.success(false) : expected(value, 'TRUE', 'FALSE')),
-        (value => value)
+        (value => value),
+        false,
     );
 
 export const numberField = <const Name extends string>(name: Name) =>
     new RecordFieldBuilder(
         name,
-        false,
         value => typeof value === 'number' && Number.isFinite(value)
             ? Result.success(value)
             : expected(value, 'a number'),
         parseNumber,
-        value => value
+        value => value,
+        false,
     );
 
 export const integerField = <const Name extends string>(name: Name) =>
     new RecordFieldBuilder(
         name,
-        false,
         value => typeof value === 'number' && Number.isSafeInteger(value)
             ? Result.success(value)
             : expected(value, 'a safe integer'),
         parseInteger,
-        value => value
+        value => value,
+        false,
     );
 
 export const bigintField = <const Name extends string>(name: Name) =>
     new RecordFieldBuilder(
         name,
-        false,
         value => typeof value === 'bigint'
             ? Result.success(value)
             : expected(value, 'a bigint'),
@@ -88,16 +87,17 @@ export const bigintField = <const Name extends string>(name: Name) =>
 
             return Result.success(BigInt(value.trim().replaceAll(',', '')));
         },
-        value => value == null ? value : value.toString()
+        value => value == null ? value : value.toString(),
+        false,
     );
 
 export const stringField = <const Name extends string>(name: Name) =>
     new RecordFieldBuilder(
         name,
-        false,
         (value => typeof value === 'string' ? Result.success(value) : expected(value, 'a string')),
         (value => Result.success(value)),
-        (value => value)
+        (value => value),
+        false,
     );
 
 /* Temporal Fields */
@@ -106,13 +106,13 @@ export const stringField = <const Name extends string>(name: Name) =>
 export const dateField = <const Name extends string>(name: Name) =>
     new RecordFieldBuilder(
         name,
-        false,
         value => value instanceof Date && !isNaN(value.getTime()) ? Result.success(value) : expected(value, 'a date'),
         (value: string) => {
             const parsed = new Date(value);
             return isNaN(parsed.getTime()) ? expected(value, 'a date') : Result.success(parsed);
         },
-        value => value
+        value => value,
+        false,
     );
 
 // Luxon DateTime
@@ -153,12 +153,12 @@ export const datetimeField = <const Name extends string>(
 
     return new RecordFieldBuilder<Name, DateTime>(
         name,
-        false,
         value => DateTime.isDateTime(value) && value.isValid
             ? Result.success(value)
             : expected(value, 'a valid DateTime'),
         parser,
-        value => value == null ? value : value.toISO({ extendedZone: true })
+        value => value == null ? value : value.toISO({ extendedZone: true }),
+        false,
     );
 };
 
@@ -167,7 +167,6 @@ export const datetimeField = <const Name extends string>(
 export const currencyField = <const Name extends string>(name: Name) =>
     new RecordFieldBuilder(
         name,
-        false,
         value => typeof value === 'number' && Number.isFinite(value)
             ? Result.success(value)
             : expected(value, 'a number'),
@@ -186,13 +185,13 @@ export const currencyField = <const Name extends string>(name: Name) =>
                 ? result
                 : expected(value, 'a currency amount');
         },
-        value => value
+        value => value,
+        false,
     );
 
 export const percentField = <const Name extends string>(name: Name) =>
     new RecordFieldBuilder(
         name,
-        false,
         value => typeof value === 'number' && Number.isFinite(value)
             ? Result.success(value)
             : expected(value, 'a number'),
@@ -211,7 +210,8 @@ export const percentField = <const Name extends string>(name: Name) =>
                 ? Result.success(result.value / (match ? 100 : 1))
                 : expected(value, 'a percentage');
         },
-        value => value
+        value => value,
+        false,
     );
 
 
@@ -240,7 +240,7 @@ const enumParser = <const Enum extends readonly string[]>(values: Enum, caseSens
 export const enumField = <const Name extends string, const Enum extends readonly string[]>(name: Name, values: Enum, caseSensitive: boolean = false) => {
     const parser = enumParser(values, caseSensitive);
 
-    return new RecordFieldBuilder(name, false, parser, parser, value => value);
+    return new RecordFieldBuilder(name, parser, parser, value => value, false);
 };
 
 
@@ -256,10 +256,10 @@ export const emailField = <const Name extends string>(name: Name, options?: Emai
 
     return new RecordFieldBuilder(
         name,
+        parser,
+        parser,
+        value => value,
         false,
-        parser,
-        parser,
-        value => value
     );
 };
 
@@ -275,10 +275,10 @@ export const urlField = <const Name extends string>(name: Name, options?: UrlOpt
 
     return new RecordFieldBuilder(
         name,
+        parser,
+        parser,
+        value => value,
         false,
-        parser,
-        parser,
-        value => value
     );
 };
 
@@ -312,6 +312,6 @@ const phoneParser = (format?: PhoneFormatter) => (value: unknown) => {
 export const phoneField = <const Name extends string>(name: Name, format?: PhoneFormatter) => {
     const parser = phoneParser(format);
 
-    return new RecordFieldBuilder(name, false, parser, parser, value => value);
+    return new RecordFieldBuilder(name, parser, parser, value => value, false);
 };
 

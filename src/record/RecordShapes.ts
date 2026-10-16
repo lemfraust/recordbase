@@ -29,7 +29,6 @@ export type RecordData<Schema extends RecordSchema> =
 
 
 /* Partial */
-
 type RecordPartialValue<Item extends RecordElement> =
     Item extends RecordField<any, infer Type, infer Optional>
         ? Optional extends true ? Type | null : Type
@@ -51,7 +50,6 @@ export type RecordPartial<Schema extends RecordSchema> =
 
 
 /* Stored */
-
 export type RecordEntry<Schema extends RecordSchema> = Simplify<
     RecordDataShape<Schema> & {
         readonly $ref: RecordRef;
@@ -66,7 +64,6 @@ export type RecordPatch<Schema extends RecordSchema> = Simplify<
 
 
 /* Names */
-
 type RecordElementNames<Item extends RecordElement> =
     Item extends RecordField<infer Name, any, any>
         ? Name
