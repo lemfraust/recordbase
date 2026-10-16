@@ -51,6 +51,9 @@ export const RecordElement = Object.freeze({
 export type RecordSchema = RecordElement[];
 
 /* Builders */
+
+export const typeOnly = (): never => { throw new Error('Type-only property cannot be accessed at runtime'); };
+
 export class RecordFieldBuilder<
     const Name extends string,
     const Type,
@@ -63,6 +66,10 @@ export class RecordFieldBuilder<
         public readonly parse: RecordParser<Type>,
         public readonly encode: RecordEncoder<Type>
     ) { freeze(this); }
+
+    get type(): Type {
+        return typeOnly();
+    }
 
     optional(): RecordFieldBuilder<Name, Type, true> {
         return new RecordFieldBuilder(
@@ -120,10 +127,18 @@ export class RecordGroupBuilder<
     }
 
     get type(): RecordGroupData<Fields> {
-        throw new Error('This is a type helper and should not be used at runtime');
+        return typeOnly();
     }
 
     optional(): RecordGroupBuilder<Name, Fields, true> {
         return new RecordGroupBuilder(this.name, true, this.fields);
     }
 }
+
+export type RecordGroupFactory<
+    Fields extends RecordField<any, any, any>[]
+> = (<const Name extends string>(
+    name: Name
+) => RecordGroupBuilder<Name, Fields, false>) & {
+    readonly type: RecordGroupBuilder<string, Fields, false>['type'];
+};

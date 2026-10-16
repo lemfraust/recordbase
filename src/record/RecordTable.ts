@@ -1,5 +1,5 @@
 import { RecordData, RecordEntry, RecordPatch } from "./RecordShapes";
-import { RecordSchema } from "./RecordSchema";
+import { RecordSchema, typeOnly } from "./RecordSchema";
 
 export class RecordTable<
     const Name extends string = string,
@@ -11,7 +11,7 @@ export class RecordTable<
     ) { }
 
     get type(): RecordData<Schema> {
-        throw new Error('This is a type helper and should not be used at runtime');
+        return typeOnly();
     }
 }
 
