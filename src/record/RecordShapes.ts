@@ -10,7 +10,7 @@ type RecordDataValue<Item extends RecordElement> =
     Item extends RecordField<any, infer Type, any>
         ? Type
         : Item extends RecordGroup<any, infer Fields, any>
-            ? RecordGroupData<Fields>
+            ? { [Key in keyof RecordGroupData<Fields>]: RecordGroupData<Fields>[Key] }
             : never;
 
 type RecordDataShape<Elements extends readonly RecordElement[]> = {
