@@ -1,4 +1,4 @@
-import { sheets_v4 } from "@googleapis/sheets";
+import { auth, sheets, sheets_v4 } from "@googleapis/sheets";
 
 import { execute, ExecutorHandler, lazy, Lazy, Resolvable, retryHandler } from "../util";
 import { GridAddress, GridCoordinate, GridRange } from "./GridAddress";
@@ -16,6 +16,26 @@ type GoogleWriteRequest = sheets_v4.Schema$Request;
 
 
 /* Google Helpers */
+export type GoogleApiCredentials = { email: string, key: string; };
+
+export type GoogleApiSource = Resolvable<GoogleApi> | GoogleApiCredentials;
+
+const isGoogleApiCredentials = (source: GoogleApiSource): source is GoogleApiCredentials =>
+    typeof source === 'object' && source !== null &&
+    'email' in source && 'key' in source;
+
+const createGoogleApi = async ({ email, key }: GoogleApiCredentials): Promise<GoogleApi> => {
+    const client = await auth.getClient({
+        credentials: {
+            client_email: email,
+            private_key: key
+        },
+        scopes: ['https://www.googleapis.com/auth/spreadsheets']
+    });
+
+    return sheets({ version: 'v4', auth: client });
+};
+
 const encodeGridName = (name: string): string => `'${name.replaceAll("'", "''")}'`;
 
 const dateToSerialNumber = (date: Date): number => {
@@ -43,21 +63,21 @@ const toGoogleCellValue = (value: GridValue): GoogleCellValue | undefined => {
 const toGoogleAppendValue = (value: GridValue): string | number | boolean | null => {
     if (value === undefined)
         return null;
-    
+
     else if (value === null)
         return '';
-    
+
     else if (value instanceof Date)
         return dateToSerialNumber(value);
-    
+
     else if (typeof value === 'string')
         return value ? `'${value}` : '';
-    
+
     else if (typeof value === 'object')
         return value.formula.startsWith('=')
             ? value.formula
             : `=${value.formula}`;
-            
+
     else
         return value;
 };
@@ -96,7 +116,7 @@ const toGoogleWriteRequest = (sheetIds: ReadonlyMap<string, number>, block: Grid
 /* Options */
 export type GoogleGridProviderOptions = {
     id: string;
-    api: Resolvable<GoogleApi>;
+    api: GoogleApiSource;
     handlers?: ExecutorHandler | GoogleGridProviderHandlerOptions;
 };
 
@@ -209,10 +229,17 @@ export class GoogleGridProvider implements GridProvider {
 
     constructor(options: GoogleGridProviderOptions) {
         this.#id = options.id;
-        this.#api = lazy(options.api);
+
+        const source = options.api;
+
+        this.#api = lazy(
+            isGoogleApiCredentials(source)
+                ? () => createGoogleApi(source)
+                : source
+        );
+
         this.#handlers = resolveHandlers(options.handlers);
     }
-
 
     async read(ranges: readonly GridRange[]): Promise<GridReadBlock[]> {
         if (!ranges.length) return [];
