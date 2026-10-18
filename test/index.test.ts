@@ -1,144 +1,301 @@
 import { describe, expect, expectTypeOf, it } from 'vitest';
-import { rb } from '../src';
+import { rb, RecordBook } from '../src';
 
-describe('RecordBase', () => {
+const Phone = rb.string('Phone');
+const Email = rb.string('Email').optional();
+const Status = rb.enum('Status', ['Open', 'Closed']);
 
-    it('creates a table with typed fields', () => {
-        const users = rb.table('Users', [
-            rb.string('name'),
-            rb.number('age'),
-            rb.boolean('active')
-        ]);
+const Contact = rb.group([Phone, Email]);
+const Billing = Contact('Billing');
 
-        expect(users.name).toBe('Users');
-
-        expect(users.schema.map(field => field.name)).toEqual([
-            'name',
-            'age',
-            'active'
-        ]);
-    });
-
-    it('checks grid helpers', () => {
-        expect(rb.grid.google).toBeTypeOf('function');
-        expect(rb.grid.store).toBeTypeOf('function');
-    });
-
-});
-
-
-const Phone = rb.phone('Phone');
-const Email = rb.email('Email').optional();
-const Age = rb.integer('Age');
-
-const ContactInfo = rb.group([Phone, Email, Age]);
+const Contacts = rb.table('Contacts', Contact);
+const Flat = rb.table('Flat', [rb.string('Name'), ...Contact]);
+const People = rb.table('People', [
+    rb.string('Name'),
+    Contact('Contact'),
+    Status.optional()
+]);
 
 type ContactData = {
     Phone: string;
     Email?: string | null;
-    Age: number;
 };
 
-describe('Group Schema Reuse', () => {
+type ContactPatch = {
+    Phone?: string;
+    Email?: string | null;
+};
 
-    it('exposes fields and supports iteration', () => {
-        expect(ContactInfo.fields.map(f => f.name)).toEqual([
-            'Phone', 'Email', 'Age'
-        ]);
+type PersonData = {
+    Name: string;
+    Contact: ContactData;
+    Status?: 'Open' | 'Closed' | null;
+};
 
-        expect([...ContactInfo]).toEqual(ContactInfo.fields);
+type PersonType = {
+    readonly $ref?: string | number;
+    Name: string;
+    Contact: ContactData;
+    Status?: 'Open' | 'Closed' | null;
+};
 
-        expectTypeOf<typeof ContactInfo.type>().toEqualTypeOf<ContactData>();
+type PersonEntry = {
+    readonly $ref: string | number;
+    Name: string;
+    Contact: ContactData;
+    Status?: 'Open' | 'Closed' | null;
+};
+
+type PersonPatch = {
+    readonly $ref: string | number;
+    Name?: string;
+    Contact?: ContactPatch;
+    Status?: 'Open' | 'Closed' | null;
+};
+
+describe('fields', () => {
+    it('preserves names and optionality', () => {
+        expect(Phone.name).toBe('Phone');
+        expect(Phone.isOptional).toBe(false);
+        expect(Email.name).toBe('Email');
+        expect(Email.isOptional).toBe(true);
     });
 
-    it('uses a group directly as a table schema', () => {
-        const Contacts = rb.table('Contacts', ContactInfo);
+    it('returns new fields when renamed or made optional', () => {
+        const renamed = Phone.as('Mobile');
+        const optional = Phone.optional();
 
-        expect(Contacts.schema.map(f => f.name)).toEqual([
-            'Phone', 'Email', 'Age'
-        ]);
-
-        expectTypeOf<typeof Contacts.type>().toEqualTypeOf<ContactData>();
+        expect(renamed.name).toBe('Mobile');
+        expect(optional.isOptional).toBe(true);
+        expect(Phone.name).toBe('Phone');
+        expect(Phone.isOptional).toBe(false);
     });
 
-    it('spreads group fields inline', () => {
-        const People = rb.table('People', [
-            rb.string('Name'),
-            ...ContactInfo
+    it('uses custom validators without mutating the original field', () => {
+        const NonEmpty = Phone.validator(value =>
+            typeof value === 'string' && value.trim().length > 0
+                ? { success: true, value: value.trim() }
+                : { success: false, info: 'Required text' }
+        );
+
+        expect(NonEmpty.validate(' 123 ')).toEqual({ success: true, value: '123' });
+        expect(NonEmpty.validate('')).toEqual({ success: false, info: 'Required text' });
+        expect(Phone.validate('')).toEqual({ success: true, value: '' });
+    });
+
+    it('supports custom parsers and encoders', () => {
+        const Tagged = rb.string('Tag')
+            .parser(value => ({ success: true, value: value.toUpperCase() }))
+            .encoder(value => value?.toLowerCase() ?? null);
+
+        expect(Tagged.parse('abc')).toEqual({ success: true, value: 'ABC' });
+        expect(Tagged.encode('ABC')).toBe('abc');
+    });
+
+    it('preserves enum literal types', () => {
+        expect(Status.validate('Open').success).toBe(true);
+        expect(Status.validate('Unknown').success).toBe(false);
+        expectTypeOf<typeof Status.type>().toEqualTypeOf<'Open' | 'Closed'>();
+    });
+});
+
+describe('groups', () => {
+    it('creates an unnamed, callable, iterable group', () => {
+        expect(typeof Contact).toBe('function');
+        expect(Contact.fields.map(field => field.name)).toEqual(['Phone', 'Email']);
+        expect([...Contact]).toEqual(Contact.fields);
+        expect(Object.isFrozen(Contact.fields)).toBe(true);
+    });
+
+    it('creates named groups and preserves their fields', () => {
+        expect(Billing.name).toBe('Billing');
+        expect([...Billing]).toEqual(Contact.fields);
+        expect(Object.isFrozen(Billing.fields)).toBe(true);
+        expect(Contact('Shipping').name).toBe('Shipping');
+    });
+
+    it('supports immediately named groups', () => {
+        const Named = rb.group('Details', [Phone, Email]);
+        expect(Named.name).toBe('Details');
+        expect([...Named].map(field => field.name)).toEqual(['Phone', 'Email']);
+        expect(Named.validate({ Phone: '123' }).success).toBe(true);
+    });
+
+    it('renames named groups and changes optionality immutably', () => {
+        const renamed = Billing.as('Shipping');
+        const optional = Billing.optional();
+
+        expect(renamed.name).toBe('Shipping');
+        expect(optional.isOptional).toBe(true);
+        expect(Billing.name).toBe('Billing');
+        expect(Billing.isOptional).toBe(false);
+        expectTypeOf<typeof renamed.name>().toEqualTypeOf<'Shipping'>();
+    });
+
+    it('validates unnamed and named groups', () => {
+        const data = { Phone: '123', Email: null };
+        const expected = { success: true, value: data };
+
+        expect(Contact.validate(data)).toEqual(expected);
+        expect(Billing.validate(data)).toEqual(expected);
+    });
+
+    it('accepts absent optional fields', () => {
+        expect(Contact.validate({ Phone: '123' })).toEqual({
+            success: true,
+            value: { Phone: '123' }
+        });
+    });
+
+    it('rejects missing, null, and incorrectly typed required fields', () => {
+        expect(Contact.validate({}).success).toBe(false);
+        expect(Contact.validate({ Phone: null }).success).toBe(false);
+        expect(Contact.validate({ Phone: 123 }).success).toBe(false);
+    });
+
+    it('rejects unknown fields', () => {
+        expect(Contact.validate({ Phone: '123', Extra: true }).success).toBe(false);
+    });
+
+    it('returns normalized values from field validators', () => {
+        const Trimmed = rb.group([
+            rb.string('Code').validator(value =>
+                typeof value === 'string'
+                    ? { success: true, value: value.trim() }
+                    : { success: false, info: 'Expected string' }
+            )
         ]);
 
-        expect(People.schema.map(f => f.name)).toEqual([
-            'Name', 'Phone', 'Email', 'Age'
-        ]);
+        expect(Trimmed.validate({ Code: ' AB ' })).toEqual({
+            success: true,
+            value: { Code: 'AB' }
+        });
+    });
+});
 
-        expectTypeOf<typeof People.type>().toEqualTypeOf<{
+describe('tables', () => {
+    it('accepts an unnamed group as the entire schema', () => {
+        expect(Contacts.schema.map(field => field.name)).toEqual(['Phone', 'Email']);
+    });
+
+    it('flattens spread group fields', () => {
+        expect(Flat.schema.map(field => field.name)).toEqual(['Name', 'Phone', 'Email']);
+    });
+
+    it('keeps named groups nested', () => {
+        expect(People.schema.map(item => item.name)).toEqual(['Name', 'Contact', 'Status']);
+    });
+
+    it('is iterable', () => {
+        expect([...People].map(item => item.name)).toEqual(['Name', 'Contact', 'Status']);
+    });
+
+    it('renames without changing the original table', () => {
+        const renamed = People.as('Customers');
+        expect(renamed.name).toBe('Customers');
+        expect(People.name).toBe('People');
+        expect(renamed.schema).toBe(People.schema);
+        expectTypeOf<typeof renamed.name>().toEqualTypeOf<'Customers'>();
+    });
+
+    it('validates table data with or without $ref', () => {
+        const data = { Name: 'John', Contact: { Phone: '123' } };
+
+        expect(People.validate(data)).toEqual({ success: true, value: data });
+        expect(People.validate({ ...data, $ref: 42 })).toEqual({
+            success: true,
+            value: { ...data, $ref: 42 }
+        });
+    });
+
+    it('validates optional nested groups', () => {
+        const Optional = rb.table('Optional', [Contact('Contact').optional()]);
+        expect(Optional.validate({}).success).toBe(true);
+        expect(Optional.validate({ Contact: null }).success).toBe(true);
+        expect(Optional.validate({ Contact: { Phone: '123' } }).success).toBe(true);
+    });
+
+    it('rejects invalid nested values', () => {
+        expect(People.validate({ Name: 'John', Contact: { Phone: 123 } }).success)
+            .toBe(false);
+        expect(People.validate({ Name: 'John' }).success).toBe(false);
+    });
+
+    it('rejects invalid $ref and extra properties', () => {
+        const data = { Name: 'John', Contact: { Phone: '123' } };
+        expect(People.validate({ ...data, $ref: true }).success).toBe(false);
+        expect(People.validate({ ...data, Extra: 1 }).success).toBe(false);
+        expect(People.validate({ ...data, Contact: { Phone: '123', Extra: 1 } }).success)
+            .toBe(false);
+    });
+
+    it('does not evaluate type-only getters at runtime', () => {
+        expect(() => People.type).toThrow();
+        expect(() => People.data).toThrow();
+        expect(() => People.entry).toThrow();
+        expect(() => People.patch).toThrow();
+        expect(() => Contact.type).toThrow();
+        expect(() => Contact.patch).toThrow();
+    });
+});
+
+describe('type inference (run tsc --noEmit too)', () => {
+    it('keeps group values and patches precise', () => {
+        expectTypeOf<typeof Phone.type>().toEqualTypeOf<string>();
+        expectTypeOf<typeof Contact.type>().toEqualTypeOf<ContactData>();
+        expectTypeOf<typeof Billing.type>().toEqualTypeOf<ContactData>();
+        expectTypeOf<typeof Contact.patch>().toEqualTypeOf<ContactPatch>();
+        expectTypeOf<typeof Billing.patch>().toEqualTypeOf<ContactPatch>();
+    });
+
+    it('infers direct and spread group schemas', () => {
+        expectTypeOf<typeof Contacts.data>().toEqualTypeOf<ContactData>();
+        expectTypeOf<typeof Flat.data>().toEqualTypeOf<{
             Name: string;
             Phone: string;
             Email?: string | null;
-            Age: number;
         }>();
     });
 
-    it('supports nested named groups', () => {
-        const Requests = rb.table('Requests', [
-            rb.string('Name'),
-            ContactInfo('Contact')
-        ]);
+    it('infers all four table representations', () => {
+        type ptype = typeof People.type;
+        type pentry = typeof People.entry;
+        type pdata = typeof People.data;
+        type ppatch = typeof People.patch;
 
-        expect(Requests.schema.map(f => f.name)).toEqual([
-            'Name', 'Contact'
-        ]);
-
-        expectTypeOf<typeof Requests.type>().toEqualTypeOf<{
-            Name: string;
-            Contact: ContactData;
-        }>();
+        expectTypeOf<ptype>().toEqualTypeOf<PersonType>();
+        expectTypeOf<pentry>().toEqualTypeOf<PersonEntry>();
+        expectTypeOf<pdata>().toEqualTypeOf<PersonData>();
+        expectTypeOf<ppatch>().toEqualTypeOf<PersonPatch>();
     });
 
-    it('supports renaming fields and groups', () => {
-        const Customers = rb.table('Customers', [
-            Phone.as('Mobile'),
-            ContactInfo('Billing').as('Primary')
-        ]);
-
-        expect(Customers.schema.map(f => f.name)).toEqual([
-            'Mobile', 'Primary'
-        ]);
-
-        expectTypeOf<typeof Customers.type>().toEqualTypeOf<{
-            Mobile: string;
-            Primary: ContactData;
-        }>();
-    });
-
-    it('infers group and table patches', () => {
-        const Requests = rb.table('Requests', [
-            rb.string('Name'),
-            ContactInfo('Contact')
-        ]);
-
-        expectTypeOf<typeof ContactInfo.patch>().toEqualTypeOf<{
-            Phone?: string;
-            Email?: string | null;
-            Age?: number;
-        }>();
-
-        expectTypeOf<typeof Requests.patch>().toEqualTypeOf<{
-            readonly $ref: string | number;
-            Name?: string;
-            Contact?: {
-                Phone?: string;
-                Email?: string | null;
-                Age?: number;
-            };
-        }>();
-
-        const patch: typeof Requests.patch = {
-            $ref: 1,
-            Contact: { Age: 30 }
+    it('accepts valid data, entries, general records, and patches', () => {
+        const data: typeof People.data = {
+            Name: 'John', Contact: { Phone: '123' }, Status: 'Open'
         };
+        const entry: typeof People.entry = { ...data, $ref: 10 };
+        const record: typeof People.type = data;
+        const patch: typeof People.patch = { $ref: 10, Contact: { Email: null } };
 
-        expect(patch.Contact?.Age).toBe(30);
+        expect(record.Name).toBe('John');
+        expect(entry.$ref).toBe(10);
+        expect(patch.Contact?.Email).toBeNull();
     });
 
+    it('rejects invalid assignments at compile time', () => {
+        if (false) {
+            // @ts-expect-error Required nested field is missing
+            const missingPhone: typeof People.data = { Name: 'John', Contact: {} };
+            // @ts-expect-error Enum value must be in the declared union
+            const wrongStatus: typeof Status.type = 'Unknown';
+            // @ts-expect-error A patch requires $ref
+            const missingRef: typeof People.patch = { Name: 'John' };
+            // @ts-expect-error $ref is not a boolean
+            const wrongRef: typeof People.type = { $ref: true, Name: 'John', Contact: { Phone: '123' } };
+            // @ts-expect-error An unnamed group cannot be a nested schema element
+            const invalidTable = rb.table('Invalid', [Contact]);
+
+            void [missingPhone, wrongStatus, missingRef, wrongRef, invalidTable];
+        }
+    });
 });

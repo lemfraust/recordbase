@@ -9,8 +9,8 @@ export type RecordRef = string | number;
 type RecordDataValue<Item extends RecordElement> =
     Item extends RecordField<any, infer Type, any>
         ? Type
-        : Item extends RecordGroup<any, infer Fields, any>
-            ? { [Key in keyof RecordGroupData<Fields>]: RecordGroupData<Fields>[Key] }
+        : Item extends { fields: infer Fields extends RecordField[] }
+            ? { [Key in keyof RecordGroupData<Fields>]: RecordGroupData<Fields>[Key]; }
             : never;
 
 type RecordDataShape<Elements extends readonly RecordElement[]> = {
@@ -30,16 +30,15 @@ export type RecordData<Schema extends RecordSchema> =
 
 /* Partial */
 type RecordPartialValue<Item extends RecordElement> =
-    Item extends RecordField<any, infer Type, infer Optional>
-        ? Optional extends true ? Type | null : Type
-        : Item extends RecordGroup<any, infer Fields, infer Optional>
-            ? { [Key in keyof RecordGroupPartial<Fields>]: RecordGroupPartial<Fields>[Key] }
-              | (Optional extends true ? null : never)
+    Item extends { fields: infer Fields extends RecordField[]; isOptional: infer Optional extends boolean; }
+        ? { [Key in keyof RecordGroupPartial<Fields>]: RecordGroupPartial<Fields>[Key]; } | (Optional extends true ? null : never)
+        : Item extends RecordField<any, infer Type, infer Optional>
+            ? Type | (Optional extends true ? null : never)
             : never;
 
 type RecordPartialShape<Elements extends readonly RecordElement[]> = {
     [Item in Elements[number] as Item['name']]?:
-        RecordPartialValue<Item>;
+        RecordPartialValue<Item> | undefined;
 };
 
 export type RecordGroupPartial<Fields extends RecordField<any, any, boolean>[]> =
