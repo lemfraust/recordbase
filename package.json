@@ -2,7 +2,7 @@
   "name": "recordbase",
   "description": "Typed Record Tables over Spreadsheets, JSON, SQL or other storage backends.",
   "author": "lemfraust",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "repository": {
     "type": "git",
     "url": "git@github.com:lemfraust/recordbase.git"
