@@ -1,6 +1,5 @@
 import { RecordReadOperation, RecordReadResults, RecordWriteOperation, RecordWriteResults } from "./RecordOperations";
-import { RecordSchema } from "./RecordSchema";
-import { RecordTable } from "./RecordTable";
+import { RecordSchema, RecordTable } from "./RecordSchema";
 
 export interface RecordReader<Tables extends readonly RecordTable<any, RecordSchema>[]> {
     read<const Reads extends readonly RecordReadOperation<Tables[number]>[]>(reads: Reads): Promise<RecordReadResults<Reads>>;

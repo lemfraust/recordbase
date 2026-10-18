@@ -1,41 +1,57 @@
 import { RecordBook } from '../record/RecordBook';
-import { RecordField, RecordFieldBuilder, RecordGroupBuilder, RecordGroupFactory, RecordProcessor, RecordSchema, typeOnly } from '../record/RecordSchema';
+import { RecordField, RecordFieldBuilder, RecordGroupBuilder, RecordGroupFactory, RecordProcessor, RecordSchema, RecordTable, typeOnly } from '../record/RecordSchema';
 import { RecordStore } from '../record/RecordStore';
-import { RecordTable } from '../record/RecordTable';
+import { freeze } from '../util';
 
 export const book = <const Tables extends readonly RecordTable<any, RecordSchema>[]>(store: RecordStore<Tables>) =>
     new RecordBook(store);
 
-export const table = <const Name extends string, const Schema extends RecordSchema>(name: Name, schema: Schema) =>
-    new RecordTable(name, schema);
-
+export function table<const Name extends string, const Schema extends RecordSchema>(name: Name, schema: Schema): RecordTable<Name, Schema>;
+export function table<const Name extends string, const Fields extends RecordField<any, any, any>[]>(name: Name, group: RecordGroupFactory<Fields>): RecordTable<Name, Fields>;
+export function table(name: string, source: RecordSchema | RecordGroupFactory<any>) {
+    return new RecordTable(name, typeof source === 'function' ? source.fields as RecordSchema : source);
+}
 export function group<const Fields extends RecordField<any, any, any>[]>(fields: Fields): RecordGroupFactory<Fields>;
 export function group<const Name extends string, const Fields extends RecordField<any, any, any>[]>(
     name: Name, fields: Fields): RecordGroupBuilder<Name, Fields, false>;
-export function group(
-    nameOrFields: string | RecordField<any, any, any>[],
-    fields?: RecordField<any, any, any>[]
+export function group<const Fields extends RecordField<any, any, any>[]>(
+    nameOrFields: string | Fields,
+    fields?: Fields
 ) {
     if (typeof nameOrFields === 'string')
-        return new RecordGroupBuilder(nameOrFields, false, fields!);
+        return new RecordGroupBuilder(nameOrFields, fields!, false);
+    else {
+        const items = freeze([...nameOrFields!]) as unknown as Fields;
 
-    const factory = (name: string) =>
-        new RecordGroupBuilder(name, false, nameOrFields);
+        const factory = <const Name extends string>(name: Name) =>
+            new RecordGroupBuilder(name, items, false);
 
-    return Object.defineProperty(factory, 'type', { get: typeOnly });
+        Object.defineProperties(factory, {
+            fields: { value: items },
+            [Symbol.iterator]: { value: () => items[Symbol.iterator]() },
+            type: { get: typeOnly },
+            patch: { get: typeOnly }
+        });
+
+        return freeze(factory) as RecordGroupFactory<Fields>;
+    }
 }
 
 export const field = <const Name extends string, Type>(name: Name, processor: RecordProcessor<Type>) =>
-    new RecordFieldBuilder(name, false, processor.validate, processor.parse, processor.encode);
+    new RecordFieldBuilder(name, processor.validate, processor.parse, processor.encode, false);
 
 export {
     booleanField as boolean,
     numberField as number,
+    integerField as integer,
     stringField as string,
+    
     dateField as date,
     datetimeField as datetime,
+    
     currencyField as currency,
     percentField as percent,
+
     enumField as enum,
     emailField as email,
     phoneField as phone,

@@ -7,4 +7,3 @@ export * from './RecordOperations';
 export * from './RecordSchema';
 export * from './RecordShapes';
 export * from './RecordStore';
-export * from './RecordTable';

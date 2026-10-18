@@ -1,12 +1,10 @@
-import { RecordReadable, RecordReadBuilder, RecordWritable, RecordWritableExecutable, RecordWriteBuilder } from "./RecordOperationBuilders";
-import { RecordAddResult, RecordReadOperation, RecordReadResults, RecordUpdateResult, RecordWriteOperation, RecordWriteResults, RecordReturn } from "./RecordOperations";
-import { RecordCache, RecordMemoryCache } from "./RecordCache";
-import { RecordElement } from "./RecordSchema";
-import { RecordEntry } from "./RecordShapes";
-import { RecordReader, RecordStore, RecordWriter } from "./RecordStore";
-import { RecordTable, RecordTableData, RecordTableEntry, RecordTablePatch, RecordTableSchema } from "./RecordTable";
 import { isArray } from "../util";
-import { RecordRef } from "./RecordShapes";
+import { RecordCache, RecordMemoryCache } from "./RecordCache";
+import { RecordReadable, RecordReadBuilder, RecordWritable, RecordWritableExecutable, RecordWriteBuilder } from "./RecordOperationBuilders";
+import { RecordAddResult, RecordReadOperation, RecordReadResults, RecordReturn, RecordUpdateResult, RecordWriteOperation, RecordWriteResults } from "./RecordOperations";
+import { RecordElement, RecordTable, RecordTableData, RecordTableEntry, RecordTablePatch, RecordTableSchema } from "./RecordSchema";
+import { RecordEntry, RecordRef } from "./RecordShapes";
+import { RecordReader, RecordStore, RecordWriter } from "./RecordStore";
 
 export type RecordCacheConfig = { auto: boolean; };
 

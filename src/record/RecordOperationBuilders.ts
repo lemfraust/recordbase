@@ -1,12 +1,13 @@
+import { Append, freeze } from "../util";
 import {
-    RecordAddResult, RecordReadOperation, RecordReadResult, RecordReadResults, RecordUpdateResult,
-    RecordWriteOperation, RecordWriteResults,
-    RecordReturn
+    RecordAddResult, RecordReadOperation, RecordReadResult, RecordReadResults,
+    RecordReturn,
+    RecordUpdateResult,
+    RecordWriteOperation, RecordWriteResults
 } from "./RecordOperations";
+import { RecordTable, RecordTableData, RecordTableEntry, RecordTablePatch } from "./RecordSchema";
 import { RecordRef } from "./RecordShapes";
 import { RecordReader, RecordWriter } from "./RecordStore";
-import { RecordTable, RecordTableData, RecordTableEntry, RecordTablePatch } from "./RecordTable";
-import { Append, freeze } from "../util";
 
 /* Returns */
 type RecordBuilderResult<Results extends readonly unknown[]> =

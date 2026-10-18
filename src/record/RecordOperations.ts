@@ -1,5 +1,5 @@
+import { RecordTable, RecordTableData, RecordTableEntry, RecordTablePatch } from "./RecordSchema";
 import { RecordRef } from "./RecordShapes";
-import { RecordTable, RecordTableData, RecordTableEntry, RecordTablePatch } from "./RecordTable";
 
 
 /* Return */

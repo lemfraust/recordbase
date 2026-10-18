@@ -10,7 +10,7 @@ type RecordDataValue<Item extends RecordElement> =
     Item extends RecordField<any, infer Type, any>
         ? Type
         : Item extends RecordGroup<any, infer Fields, any>
-            ? RecordGroupData<Fields>
+            ? { [Key in keyof RecordGroupData<Fields>]: RecordGroupData<Fields>[Key] }
             : never;
 
 type RecordDataShape<Elements extends readonly RecordElement[]> = {
@@ -29,12 +29,12 @@ export type RecordData<Schema extends RecordSchema> =
 
 
 /* Partial */
-
 type RecordPartialValue<Item extends RecordElement> =
     Item extends RecordField<any, infer Type, infer Optional>
         ? Optional extends true ? Type | null : Type
         : Item extends RecordGroup<any, infer Fields, infer Optional>
-            ? Optional extends true ? RecordGroupPartial<Fields> | null : RecordGroupPartial<Fields>
+            ? { [Key in keyof RecordGroupPartial<Fields>]: RecordGroupPartial<Fields>[Key] }
+              | (Optional extends true ? null : never)
             : never;
 
 type RecordPartialShape<Elements extends readonly RecordElement[]> = {
@@ -50,7 +50,6 @@ export type RecordPartial<Schema extends RecordSchema> =
 
 
 /* Stored */
-
 export type RecordEntry<Schema extends RecordSchema> = Simplify<
     RecordDataShape<Schema> & {
         readonly $ref: RecordRef;
@@ -65,7 +64,6 @@ export type RecordPatch<Schema extends RecordSchema> = Simplify<
 
 
 /* Names */
-
 type RecordElementNames<Item extends RecordElement> =
     Item extends RecordField<infer Name, any, any>
         ? Name
