@@ -1,4 +1,4 @@
-import { RecordData, RecordEntry, RecordGroupData, RecordGroupPartial, RecordPatch } from "./RecordShapes";
+import { RecordData, RecordEntry, RecordGroupData, RecordGroupPartial, RecordPatch, RecordType } from "./RecordShapes";
 import { freeze, Result } from "../util";
 
 /* Value */
@@ -173,7 +173,17 @@ export class RecordTable<
         public readonly schema: Schema
     ) { freeze(this); }
 
-    get type(): RecordData<Schema> {
+
+    // Type Helpers
+    get type(): RecordType<Schema> {
+        return typeOnly();
+    }
+
+    get data(): RecordData<Schema> {
+        return typeOnly();
+    }
+
+    get entry(): RecordEntry<Schema> {
         return typeOnly();
     }
 
@@ -181,12 +191,15 @@ export class RecordTable<
         return typeOnly();
     }
 
+    
     as<NewName extends string>(name: NewName): RecordTable<NewName, Schema> {
         return new RecordTable(name, this.schema);
     }
 }
 
 export type RecordTableSchema<Table extends RecordTable> = Table['schema'];
+
+export type RecordTableType<Table extends RecordTable> = RecordType<Table['schema']>;
 
 export type RecordTableData<Table extends RecordTable> = RecordData<Table['schema']>;
 

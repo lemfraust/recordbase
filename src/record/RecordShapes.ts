@@ -50,6 +50,12 @@ export type RecordPartial<Schema extends RecordSchema> =
 
 
 /* Stored */
+export type RecordType<Schema extends RecordSchema> = Simplify<
+    RecordDataShape<Schema> & {
+        readonly $ref?: RecordRef;
+    }
+>;
+
 export type RecordEntry<Schema extends RecordSchema> = Simplify<
     RecordDataShape<Schema> & {
         readonly $ref: RecordRef;
