@@ -36,7 +36,16 @@ export type RecordGroup<
     name: Name;
     fields: Fields;
     isOptional: Optional;
-};
+} & Iterable<Fields[number]>;
+
+export interface RecordGroupDefinition<Fields extends RecordField<any, any, any>[]> extends Iterable<Fields[number]> {
+    readonly fields: Readonly<Fields>;
+
+    readonly type: RecordGroupData<Fields>;
+    readonly patch: RecordGroupPartial<Fields>;
+
+    validate(value: unknown): Result<RecordGroupData<Fields>, string>;
+}
 
 export type RecordElement = RecordField | RecordGroup;
 
@@ -50,6 +59,72 @@ export const RecordElement = Object.freeze({
 
 export type RecordSchema = RecordElement[];
 
+
+// Validation
+export function validateSchema<Schema extends RecordSchema>(schema: Schema, input: unknown): Result<RecordData<Schema>, string>;
+export function validateSchema<Schema extends RecordSchema>(schema: Schema, input: unknown, allowRef: true): Result<RecordType<Schema>, string>;
+export function validateSchema<Schema extends RecordSchema>(schema: Schema, input: unknown, allowRef = false)
+    : Result<RecordData<Schema> | RecordType<Schema>, string> {
+
+    if (input === null || typeof input !== 'object' || Array.isArray(input))
+        return Result.failure('Expected an object');
+
+
+    const record = input as Record<string, unknown>;
+    const output: Record<string, unknown> = {};
+
+    const allowed = new Set<string>(schema.map(item => item.name));
+
+    if (allowRef)
+        allowed.add('$ref');
+
+    // Reject unknown properties
+    for (const name of Object.keys(record)) {
+        if (!allowed.has(name))
+            return Result.failure(`Unknown field: ${name}`);
+    }
+
+    for (const item of schema) {
+        const value = record[item.name];
+
+        // Required and optional fields
+        if (value === null || value === undefined) {
+            if (!item.isOptional)
+                return Result.failure(`${item.name}: required`);
+
+            if (value === null)
+                output[item.name] = null;
+
+            continue;
+        }
+
+        // Groups are validated recursively
+        const result = 'fields' in item
+            ? validateSchema(item.fields, value)
+            : item.validate(value);
+
+        if (!result.success)
+            return Result.failure(`${item.name}: ${result.info}`);
+
+        output[item.name] = result.value;
+    }
+
+    // Optional table reference
+    if (allowRef && record.$ref !== undefined) {
+        if (
+            typeof record.$ref !== 'string' &&
+            typeof record.$ref !== 'number'
+        ) {
+            return Result.failure(
+                '$ref: expected a string or number'
+            );
+        }
+
+        output.$ref = record.$ref;
+    }
+
+    return Result.success(output as RecordType<Schema>);
+}
 
 /* Builders */
 export const typeOnly = (): never => { throw new Error('Type-only property cannot be accessed at runtime'); };
@@ -126,7 +201,7 @@ export class RecordGroupBuilder<
     const Name extends string,
     const Fields extends RecordField<any, any, any>[] = [],
     Optional extends boolean = false,
-> implements RecordGroup<Name, Fields, Optional> {
+> implements RecordGroup<Name, Fields, Optional>, RecordGroupDefinition<Fields> {
     constructor(
         public readonly name: Name,
         public readonly fields: Fields,
@@ -152,22 +227,24 @@ export class RecordGroupBuilder<
     as<NewName extends string>(name: NewName): RecordGroupBuilder<NewName, Fields, Optional> {
         return new RecordGroupBuilder<NewName, Fields, Optional>(name, this.fields, this.isOptional);
     }
+
+    validate(value: unknown): Result<RecordGroupData<Fields>, string> {
+        return validateSchema(this.fields, value);
+    }
+
+    [Symbol.iterator]() {
+        return this.fields[Symbol.iterator]();
+    }
 }
 
-export type RecordGroupFactory<
-    Fields extends RecordField<any, any, any>[]
-> = (<const Name extends string>(
-    name: Name
-) => RecordGroupBuilder<Name, Fields, false>) & Iterable<Fields[number]> & {
-    readonly fields: Readonly<Fields>;
-    readonly type: RecordGroupData<Fields>;
-    readonly patch: RecordGroupPartial<Fields>;
-};
+export type RecordGroupFactory<Fields extends RecordField<any, any, any>[]> =
+    (<const Name extends string>(name: Name) => RecordGroupBuilder<Name, Fields, false>)
+    & RecordGroupDefinition<Fields>;
 
 export class RecordTable<
     const Name extends string = string,
     const Schema extends RecordSchema = RecordSchema
-> {
+> implements Iterable<Schema[number]> {
     constructor(
         public readonly name: Name,
         public readonly schema: Schema
@@ -191,9 +268,17 @@ export class RecordTable<
         return typeOnly();
     }
 
-    
+
     as<NewName extends string>(name: NewName): RecordTable<NewName, Schema> {
         return new RecordTable(name, this.schema);
+    }
+
+    validate(value: unknown): Result<RecordType<Schema>, string> {
+        return validateSchema(this.schema, value, true);
+    }
+
+    [Symbol.iterator]() {
+        return this.schema[Symbol.iterator]();
     }
 }
 
