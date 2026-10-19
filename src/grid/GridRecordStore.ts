@@ -1,10 +1,10 @@
 import { RecordReadOperation, RecordReadResults, RecordReturn, RecordWriteOperation, RecordWriteResults } from "../record/RecordOperations";
-import { RecordElement, RecordSchema, RecordTable, RecordTableData, RecordTableEntry, RecordTablePatch } from "../record/RecordSchema";
+import { RecordElement, RecordSchema, RecordTable, RecordTableData, RecordTableEntry, RecordTablePatch, RecordValue } from "../record/RecordSchema";
 import { RecordRef } from "../record/RecordShapes";
 import { RecordStore } from "../record/RecordStore";
 import { freeze, isArray, Result, toArray, toLength } from "../util";
 import { GridAddress, GridCoordinate, GridRange } from "./GridAddress";
-import { GridBlock, GridReadBlock, GridValue, GridWriteBlock } from "./GridBlock";
+import { GridBlock, GridReadBlock, GridWriteBlock } from "./GridBlock";
 import { GridProvider, GridWriteRequest } from "./GridProvider";
 
 export type GridTableOptions = {
@@ -220,8 +220,8 @@ export class GridRecordStore<const Tables extends readonly RecordTable<any, Reco
 
 
     // Write
-    #encodeRow<Table extends Tables[number]>(table: Table, data: RecordTableData<Table> | RecordTablePatch<Table>): GridValue[] {
-        const values: GridValue[] = [];
+    #encodeRow<Table extends Tables[number]>(table: Table, data: RecordTableData<Table> | RecordTablePatch<Table>): RecordValue[] {
+        const values: RecordValue[] = [];
         const record = data as Record<string, any>;
 
         for (const element of table.schema) {

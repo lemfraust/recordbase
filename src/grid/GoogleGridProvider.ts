@@ -63,6 +63,19 @@ const temporalToSerial = (value: RecordTemporalValue): number => {
     return date + time;
 };
 
+const pad = (value: number, length = 2) => String(value).padStart(length, '0');
+
+const temporalToGoogleValue = (value: RecordTemporalValue): number | string => {
+    if (value.kind !== 'zonedatetime')
+        return temporalToSerial(value);
+
+    const { date, time, zone } = value;
+
+    return `${pad(date.year, 4)}-${pad(date.month)}-${pad(date.day)}T` +
+        `${pad(time.hour)}:${pad(time.minute ?? 0)}:` +
+        `${pad(time.second ?? 0)}.${pad(time.millisecond ?? 0, 3)}[${zone}]`;
+};
+
 const toGoogleCellValue = (value: RecordValue): GoogleCellValue | undefined => {
     if (typeof value === 'string')
         return { stringValue: value };
@@ -71,20 +84,20 @@ const toGoogleCellValue = (value: RecordValue): GoogleCellValue | undefined => {
     else if (typeof value === 'boolean')
         return { boolValue: value };
     else if (isRecordTemporal(value))
-        return { numberValue: temporalToSerial(value) };
+        return toGoogleCellValue(temporalToGoogleValue(value));
     else if (value === null)
         return { stringValue: '' };
 };
 
 const toGoogleAppendValue = (value: RecordValue): string | number | boolean | null => {
-    if (value === undefined)
+    if (typeof value === 'string')
+        return value ? `'${value}` : '';
+    else if (value === undefined)
         return null;
+    else if (isRecordTemporal(value))
+        return toGoogleAppendValue(temporalToGoogleValue(value));
     else if (value === null)
         return '';
-    else if (isRecordTemporal(value))
-        return temporalToSerial(value);
-    else if (typeof value === 'string')
-        return value ? `'${value}` : '';
     else
         return value;
 };
