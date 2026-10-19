@@ -2,8 +2,9 @@ import { auth, sheets, sheets_v4 } from "@googleapis/sheets";
 
 import { execute, ExecutorHandler, lazy, Lazy, Resolvable, retryHandler } from "../util";
 import { GridAddress, GridCoordinate, GridRange } from "./GridAddress";
-import { GridBlock, GridReadBlock, GridWriteBlock, GridValue } from "./GridBlock";
+import { GridBlock, GridReadBlock, GridWriteBlock } from "./GridBlock";
 import { GridProvider, GridWriteRequest, GridWriteResults } from "./GridProvider";
+import { isRecordTemporal, RecordTemporalValue, RecordValue } from "../record";
 
 
 /* Google Types */
@@ -38,46 +39,52 @@ const createGoogleApi = async ({ email, key }: GoogleApiCredentials): Promise<Go
 
 const encodeGridName = (name: string): string => `'${name.replaceAll("'", "''")}'`;
 
-const dateToSerialNumber = (date: Date): number => {
-    const epoch = new Date(1899, 11, 30);
-    return (date.getTime() - epoch.getTime()) / 86400000;
+const DAY = 86400000;
+const EPOCH = Date.UTC(1899, 11, 30);
+
+const temporalToSerial = (value: RecordTemporalValue): number => {
+    const date = 'date' in value
+        ? (Date.UTC(
+            value.date.year,
+            value.date.month - 1,
+            value.date.day
+        ) - EPOCH) / DAY
+        : 0;
+
+    const time = 'time' in value
+        ? (
+            value.time.hour * 3600000 +
+            (value.time.minute ?? 0) * 60000 +
+            (value.time.second ?? 0) * 1000 +
+            (value.time.millisecond ?? 0)
+        ) / DAY
+        : 0;
+
+    return date + time;
 };
 
-const toGoogleCellValue = (value: GridValue): GoogleCellValue | undefined => {
+const toGoogleCellValue = (value: RecordValue): GoogleCellValue | undefined => {
     if (typeof value === 'string')
         return { stringValue: value };
     else if (typeof value === 'number')
         return { numberValue: value };
     else if (typeof value === 'boolean')
         return { boolValue: value };
-    else if (value instanceof Date)
-        return { numberValue: dateToSerialNumber(value) };
+    else if (isRecordTemporal(value))
+        return { numberValue: temporalToSerial(value) };
     else if (value === null)
         return { stringValue: '' };
-    else if (value === undefined)
-        return undefined;
-    else
-        return { formulaValue: value.formula.startsWith('=') ? value.formula : `=${value.formula}` };
 };
 
-const toGoogleAppendValue = (value: GridValue): string | number | boolean | null => {
+const toGoogleAppendValue = (value: RecordValue): string | number | boolean | null => {
     if (value === undefined)
         return null;
-
     else if (value === null)
         return '';
-
-    else if (value instanceof Date)
-        return dateToSerialNumber(value);
-
+    else if (isRecordTemporal(value))
+        return temporalToSerial(value);
     else if (typeof value === 'string')
         return value ? `'${value}` : '';
-
-    else if (typeof value === 'object')
-        return value.formula.startsWith('=')
-            ? value.formula
-            : `=${value.formula}`;
-
     else
         return value;
 };

@@ -1,12 +1,11 @@
+import { RecordValue } from "../record";
 import { GridCoordinate } from "./GridAddress";
-
-export type GridValue = string | number | boolean | Date | { formula: string; } | null | undefined;
 
 export type GridBlock<T> = { grid: string; start: GridCoordinate | undefined, rows: T[][]; };
 
 export type GridReadBlock = GridBlock<string>;
 
-export type GridWriteBlock = GridBlock<GridValue>;
+export type GridWriteBlock = GridBlock<RecordValue>;
 
 function GridColumnBlock<T>(grid: string, values: T[]): GridBlock<T>;
 function GridColumnBlock<T>(grid: string, start: GridCoordinate | undefined, values: T[]): GridBlock<T>;

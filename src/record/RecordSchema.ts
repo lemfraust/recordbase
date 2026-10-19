@@ -14,8 +14,10 @@ export type RecordTemporalValue =
 
 export type RecordTemporalKind = RecordTemporalValue['kind'];
 
-export type RecordValue = | string | number | boolean | RecordTemporalValue | { formula: string; } | null | undefined;
+export type RecordValue = string | number | boolean | RecordTemporalValue | null | undefined;
 
+export const isRecordTemporal = (value: RecordValue): value is RecordTemporalValue =>
+    value !== null && typeof value === 'object' && 'kind' in value;
 
 /* Processor */
 export type RecordValidator<Type> = (value: unknown) => Result<Type, string>;
