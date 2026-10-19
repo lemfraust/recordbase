@@ -2,7 +2,20 @@ import { RecordData, RecordEntry, RecordGroupData, RecordGroupPartial, RecordPat
 import { freeze, Result } from "../util";
 
 /* Value */
-export type RecordValue = string | number | boolean | Date | { formula: string; } | null | undefined;
+export type RecordDate = { year: number; month: number; day: number; };
+
+export type RecordTime = { hour: number; minute?: number; second?: number; millisecond?: number; };
+
+export type RecordTemporalValue =
+    | { kind: 'date'; date: RecordDate; }
+    | { kind: 'time'; time: RecordTime; }
+    | { kind: 'datetime'; date: RecordDate; time: RecordTime; }
+    | { kind: 'zonedatetime'; date: RecordDate; time: RecordTime; zone: string; };
+
+export type RecordTemporalKind = RecordTemporalValue['kind'];
+
+export type RecordValue = | string | number | boolean | RecordTemporalValue | { formula: string; } | null | undefined;
+
 
 /* Processor */
 export type RecordValidator<Type> = (value: unknown) => Result<Type, string>;

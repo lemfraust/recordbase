@@ -1,6 +1,6 @@
 import { DateTime } from 'luxon';
 
-import { RecordFieldBuilder } from "./RecordSchema";
+import { RecordDate, RecordFieldBuilder, RecordTemporalKind, RecordTemporalValue, RecordTime } from "./RecordSchema";
 import { Result } from "../util";
 import isEmail, { IsEmailOptions } from 'validator/lib/isEmail';
 import isURL from 'validator/lib/isURL';
@@ -101,66 +101,153 @@ export const stringField = <const Name extends string>(name: Name) =>
     );
 
 /* Temporal Fields */
+const encodeTemporal = (
+    kind: RecordTemporalKind,
+    date: RecordDate = { year: 1970, month: 1, day: 1 },
+    time: RecordTime = { hour: 0 },
+    zone: string = 'UTC'
+): RecordTemporalValue => {
+    switch (kind) {
+        case 'date':
+            return { kind, date };
+        case 'time':
+            return { kind, time };
+        case 'datetime':
+            return { kind, date, time };
+        case 'zonedatetime':
+            return { kind, date, time, zone };
+    }
+};
+
+const parseTemporal = (value: unknown, kind: RecordTemporalKind): DateTime | undefined => {
+
+    if (!value || typeof value !== 'object' || !('kind' in value) || value.kind !== kind)
+        return undefined;
+
+    const temporal = value as RecordTemporalValue;
+
+    const date: RecordDate = 'date' in temporal ? temporal.date : { year: 1970, month: 1, day: 1 };
+
+    const time: RecordTime = 'time' in temporal ? temporal.time : { hour: 0 };
+
+    if (!date || !time)
+        return undefined;
+
+    const zone = temporal.kind === 'zonedatetime' ? temporal.zone : 'UTC';
+
+    if (typeof zone !== 'string')
+        return undefined;
+
+    // Luxon expects UTC+03:00 rather than a bare +03:00 zone.
+    const luxonZone = /^[+-]\d{2}:\d{2}$/.test(zone) ? `UTC${zone}` : zone;
+
+    try {
+        const parsed = DateTime.fromObject({
+            year: date.year,
+            month: date.month,
+            day: date.day,
+            hour: time.hour,
+            minute: time.minute ?? 0,
+            second: time.second ?? 0,
+            millisecond: time.millisecond ?? 0
+        }, { zone: luxonZone });
+
+        if (!parsed.isValid ||
+            parsed.year !== date.year ||
+            parsed.month !== date.month ||
+            parsed.day !== date.day ||
+            parsed.hour !== time.hour ||
+            parsed.minute !== (time.minute ?? 0) ||
+            parsed.second !== (time.second ?? 0) ||
+            parsed.millisecond !== (time.millisecond ?? 0))
+            return undefined;
+
+        return parsed;
+    }
+    catch {
+        return undefined;
+    }
+};
 
 // JS Date
-export const dateField = <const Name extends string>(name: Name) =>
-    new RecordFieldBuilder(
+export function jsdateField<const Name extends string>(name: Name, kind: Exclude<RecordTemporalKind, 'zonedatetime'>): RecordFieldBuilder<Name, Date>;
+export function jsdateField<const Name extends string>(name: Name, kind: 'zonedatetime', zone: string): RecordFieldBuilder<Name, Date>;
+export function jsdateField<const Name extends string>(name: Name, kind: RecordTemporalKind, zone?: string): RecordFieldBuilder<Name, Date> {
+    return new RecordFieldBuilder<Name, Date>(
         name,
-        value => value instanceof Date && !isNaN(value.getTime()) ? Result.success(value) : expected(value, 'a date'),
-        (value: string) => {
-            const parsed = new Date(value);
-            return isNaN(parsed.getTime()) ? expected(value, 'a date') : Result.success(parsed);
-        },
-        value => value,
-        false,
-    );
-
-// Luxon DateTime
-export type DateTimeOptions = {
-    formats?: readonly string[];
-    locale?: string;
-    zone?: string;
-};
-
-const datetimeParser = ({ formats = [], locale = 'en-US', zone = 'UTC' }: DateTimeOptions) => (value: unknown) => {
-    if (typeof value !== 'string')
-        return expected(value, 'a date/time');
-
-    const iso = DateTime.fromISO(value, { zone, setZone: true });
-
-    if (iso.isValid)
-        return Result.success(iso);
-
-    for (const format of formats) {
-        const parsed = DateTime.fromFormat(value, format, {
-            locale,
-            zone,
-            setZone: true
-        });
-
-        if (parsed.isValid)
-            return Result.success(parsed);
-    }
-
-    return expected(value, 'a date/time');
-};
-
-export const datetimeField = <const Name extends string>(
-    name: Name,
-    options: DateTimeOptions = {}
-) => {
-    const parser = datetimeParser(options);
-
-    return new RecordFieldBuilder<Name, DateTime>(
-        name,
-        value => DateTime.isDateTime(value) && value.isValid
+        value => value instanceof Date && !isNaN(value.getTime())
             ? Result.success(value)
-            : expected(value, 'a valid DateTime'),
-        parser,
-        value => value == null ? value : value.toISO({ extendedZone: true }),
-        false,
+            : expected(value, 'a date'),
+        value => {
+            const parsed = parseTemporal(value, kind);
+
+            return parsed
+                ? Result.success(parsed.toJSDate())
+                : expected(value, `a ${kind}`);
+        },
+        value => {
+            if (value == null)
+                return value;
+
+            // A JS Date is an instant. Use the requested zone when available; otherwise use the runtime's local timezone.
+            const dt = DateTime.fromJSDate(value, { zone: zone ?? 'local' });
+
+            return encodeTemporal(
+                kind,
+                {
+                    year: dt.year,
+                    month: dt.month,
+                    day: dt.day
+                },
+                {
+                    hour: dt.hour,
+                    minute: dt.minute,
+                    second: dt.second,
+                    millisecond: dt.millisecond
+                },
+                zone
+            );
+        },
+        false
     );
-};
+}
+
+export const datetimeField = <const Name extends string>(name: Name, kind: RecordTemporalKind) => new RecordFieldBuilder<Name, DateTime>(
+    name,
+    value => DateTime.isDateTime(value) && value.isValid
+        ? Result.success(value)
+        : expected(value, 'a valid DateTime'),
+    value => {
+        const parsed = parseTemporal(value, kind);
+
+        return parsed
+            ? Result.success(parsed)
+            : expected(value, `a ${kind}`);
+    },
+    value => {
+        if (value == null)
+            return value;
+
+        return encodeTemporal(
+            kind,
+            {
+                year: value.year,
+                month: value.month,
+                day: value.day
+            },
+            {
+                hour: value.hour,
+                minute: value.minute,
+                second: value.second,
+                millisecond: value.millisecond
+            },
+            value.zone.type === 'fixed' && value.offset !== 0
+                ? value.toFormat('ZZ')
+                : value.zoneName ?? 'UTC'
+        );
+    },
+    false,
+);
 
 
 /* Specialized Number Fields */

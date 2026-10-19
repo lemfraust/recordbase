@@ -48,7 +48,7 @@ export {
     integerField as integer,
     stringField as string,
 
-    dateField as date,
+    jsdateField as jsdate,
     datetimeField as datetime,
 
     currencyField as currency,
