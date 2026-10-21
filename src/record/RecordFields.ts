@@ -1,104 +1,324 @@
 import { DateTime } from 'luxon';
 
-import { RecordDate, RecordFieldBuilder, RecordTemporalKind, RecordTemporalValue, RecordTime } from "./RecordSchema";
-import { Result } from "../util";
+import { IsURLOptions } from 'validator';
 import isEmail, { IsEmailOptions } from 'validator/lib/isEmail';
 import isURL from 'validator/lib/isURL';
-import { IsURLOptions } from 'validator';
+import { Result } from "../util";
+import { RecordDate, RecordFieldBuilder, RecordTemporalKind, RecordTemporalValue, RecordTime } from "./RecordSchema";
 
 
 /* Helpers */
 const expected = (received: any, ...expected: string[]) =>
     Result.failure(`Expected ${expected.length === 1 ? expected[0] : expected.join('|')}, but received '${received}'`);
 
-const numberPattern = /^[+-]?(?:(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i;
 
-const parseNumber = (value: string) => {
+const parseNumeric = (value: string, pattern: RegExp, error: string, validator: (value: number) => boolean) => {
     const text = value.trim();
 
-    if (!numberPattern.test(text))
-        return expected(value, 'a number');
+    if (pattern.test(text)) {
+        const parsed = Number(text.replaceAll(',', ''));
 
-    const parsed = Number(text.replaceAll(',', ''));
+        if (validator(parsed))
+            return Result.success(parsed);
+    }
 
-    return Number.isFinite(parsed)
-        ? Result.success(parsed)
-        : expected(value, 'a number');
+    return expected(value, error);
 };
+
+const numberPattern = /^[+-]?(?:(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i;
+
+const parseNumber = (value: string) => parseNumeric(value, numberPattern, 'a number', Number.isFinite);
 
 
 const integerPattern = /^[+-]?(?:\d{1,3}(?:,\d{3})+|\d+)$/;
 
-const parseInteger = (value: string) => {
-    const text = value.trim();
+const getIntegerError = (unsafe: boolean) => `a${unsafe ? 'n' : ' safe'} integer`;
 
-    if (!integerPattern.test(text))
-        return expected(value, 'a safe integer');
+const getIntegerValidator = (unsafe: boolean) => unsafe ? Number.isInteger : Number.isSafeInteger;
 
-    const parsed = Number(text.replaceAll(',', ''));
+const parseInteger = (value: string, unsafe: boolean = false) =>
+    parseNumeric(value, integerPattern, getIntegerError(unsafe), getIntegerValidator(unsafe));
 
-    return Number.isSafeInteger(parsed)
-        ? Result.success(parsed)
-        : expected(value, 'a safe integer');
-};
 
 
 /* Primitive Fields */
-export const booleanField = <const Name extends string>(name: Name) =>
-    new RecordFieldBuilder(
+export const booleanField = <const Name extends string>(name: Name) => {
+    const error = 'a boolean';
+
+    return new RecordFieldBuilder(
         name,
-        (value => typeof value === 'boolean' ? Result.success(value) : expected(value, 'a boolean')),
-        (value => value === 'TRUE' ? Result.success(true) : value === 'FALSE' ? Result.success(false) : expected(value, 'TRUE', 'FALSE')),
+        (value => typeof value === 'boolean' ? Result.success(value) : expected(value, error)),
+        value => {
+            switch (typeof value) {
+                case 'boolean':
+                    return Result.success(value);
+                case 'number':
+                    if (isFinite(value))
+                        return Result.success(value > 0);
+                    break;
+                case 'string': {
+                    const text = value.trim().toLowerCase();
+
+                    if (text === 'true') return Result.success(true);
+                    else if (text === 'false') return Result.success(false);
+                }
+            }
+
+            return expected(value, error);
+        },
         (value => value),
         false,
     );
+};
 
-export const numberField = <const Name extends string>(name: Name) =>
-    new RecordFieldBuilder(
-        name,
-        value => typeof value === 'number' && Number.isFinite(value)
-            ? Result.success(value)
-            : expected(value, 'a number'),
-        parseNumber,
-        value => value,
-        false,
-    );
+export const numberField = <const Name extends string>(name: Name) => {
+    const error = 'a number';
 
-export const integerField = <const Name extends string>(name: Name) =>
-    new RecordFieldBuilder(
+    return new RecordFieldBuilder(
         name,
-        value => typeof value === 'number' && Number.isSafeInteger(value)
-            ? Result.success(value)
-            : expected(value, 'a safe integer'),
-        parseInteger,
-        value => value,
-        false,
-    );
-
-export const bigintField = <const Name extends string>(name: Name) =>
-    new RecordFieldBuilder(
-        name,
-        value => typeof value === 'bigint'
-            ? Result.success(value)
-            : expected(value, 'a bigint'),
+        value => typeof value === 'number' && Number.isFinite(value) ? Result.success(value) : expected(value, error),
         value => {
-            if (typeof value !== 'string' || !integerPattern.test(value.trim()))
-                return expected(value, 'a bigint');
+            switch (typeof value) {
+                case 'number':
+                    if (isFinite(value)) return Result.success(value);
+                    break;
+                case 'string':
+                    return parseNumber(value);
+            }
 
-            return Result.success(BigInt(value.trim().replaceAll(',', '')));
+            return expected(value, error);
+        },
+        value => value,
+        false,
+    );
+};
+
+export const integerField = <const Name extends string>(name: Name, unsafe: boolean = false) => {
+    const error = getIntegerError(unsafe);
+
+    const validator = getIntegerValidator(unsafe);
+
+    return new RecordFieldBuilder(
+        name,
+        value => typeof value === 'number' && validator(value) ? Result.success(value) : expected(value, error),
+        value => {
+            switch (typeof value) {
+                case 'number':
+                    if (validator(value)) return Result.success(value); else break;
+                case 'string':
+                    return parseInteger(value, unsafe);
+            }
+
+            return expected(value, error);
+        },
+        value => value,
+        false,
+    );
+};
+
+export const bigintField = <const Name extends string>(name: Name) => {
+    const error = 'a bigint';
+
+    return new RecordFieldBuilder(
+        name,
+        value => typeof value === 'bigint' ? Result.success(value) : expected(value, error),
+        value => {
+            switch (typeof value) {
+                case 'number':
+                    if (Number.isInteger(value)) return Result.success(BigInt(value));
+                    break;
+                case 'string':
+                    if (integerPattern.test(value.trim())) return Result.success(BigInt(value.trim().replaceAll(',', '')));
+                    break;
+            }
+
+            return expected(value, error);
         },
         value => value == null ? value : value.toString(),
         false,
     );
+};
 
-export const stringField = <const Name extends string>(name: Name) =>
-    new RecordFieldBuilder(
+export const stringField = <const Name extends string>(name: Name, match?: RegExp) => {
+    const pattern = match
+        ? new RegExp(match.source, match.flags.replace(/[gy]/g, ''))
+        : undefined;
+
+    const matcher = (value: unknown): value is string => typeof value === 'string' && (!pattern || pattern.test(value));
+
+    const error = `a string${match ? ` matching ${match}` : ''}`;
+
+    return new RecordFieldBuilder(
         name,
-        (value => typeof value === 'string' ? Result.success(value) : expected(value, 'a string')),
-        (value => Result.success(value)),
-        (value => value),
+        value => matcher(value) ? Result.success(value) : expected(value, error),
+        value => matcher(value) ? Result.success(value) : expected(value, error),
+        value => value,
         false,
     );
+};
+
+/* Specialized Number Fields */
+export const currencyField = <const Name extends string>(name: Name) => {
+    const error = 'a currency';
+
+    return new RecordFieldBuilder(
+        name,
+        value => typeof value === 'number' && Number.isFinite(value) ? Result.success(value) : expected(value, error),
+        value => {
+            switch (typeof value) {
+                case 'number':
+                    if (isFinite(value))
+                        return Result.success(value);
+                    break;
+                case 'string': {
+                    const text = value.trim();
+
+                    const [_match, sign, numeric] = /^([+-]?)\$?([\d.,]+)$/.exec(text) ?? [];
+
+                    const result = parseNumber(numeric ? `${sign}${numeric}` : text);
+
+                    if (result.success)
+                        return result;
+                }
+            }
+
+            return expected(value, error);
+        },
+        value => value,
+        false,
+    );
+};
+export const percentField = <const Name extends string>(name: Name) => {
+    const error = 'a percentage';
+
+    return new RecordFieldBuilder(
+        name,
+        value => typeof value === 'number' && Number.isFinite(value) ? Result.success(value) : expected(value, error),
+        value => {
+            switch (typeof value) {
+                case 'number':
+                    if (isFinite(value))
+                        return Result.success(value);
+                    break;
+                case 'string': {
+                    const text = value.trim();
+
+                    const [_match, numeric, percent] = /^([+-]?[\d.,]+)(%)?$/.exec(text) ?? [];
+
+                    const result = parseNumber(percent ? numeric : text);
+
+                    if (result.success)
+                        return Result.success(percent ? result.value / 100 : result.value);
+                }
+            }
+
+            return expected(value, error);
+        },
+        value => value,
+        false,
+    );
+};
+
+/* Specialized String Fields */
+
+// Enum
+const enumParser = <const Enum extends readonly string[]>(values: Enum, caseSensitive: boolean) => {
+    const choices: readonly Enum[number][] = values;
+
+    const find = caseSensitive
+        ? (value: string) => choices.find(item => item === value)
+        : (value: string) => choices.find(item => item.toLowerCase() === value.toLowerCase());
+
+    return (value: unknown) => {
+        if (typeof value !== 'string')
+            return expected(value, ...values);
+
+        const match = find(value);
+
+        return match !== undefined
+            ? Result.success(match)
+            : expected(value, ...values);
+    };
+};
+
+export const enumField = <const Name extends string, const Enum extends readonly string[]>(name: Name, values: Enum, caseSensitive: boolean = false) => {
+    const parser = enumParser(values, caseSensitive);
+
+    return new RecordFieldBuilder(name, parser, parser, value => value, false);
+};
+
+
+// Email
+export type EmailOptions = IsEmailOptions;
+
+const makeEmailParser = (options?: EmailOptions) =>
+    (value: unknown) =>
+        typeof value === 'string' && isEmail(value, options) ? Result.success(value) : expected(value, 'an email address');
+
+export const emailField = <const Name extends string>(name: Name, options?: EmailOptions) => {
+    const parser = makeEmailParser(options);
+
+    return new RecordFieldBuilder(
+        name,
+        parser,
+        parser,
+        value => value,
+        false,
+    );
+};
+
+// Url
+export type UrlOptions = IsURLOptions;
+
+const makeUrlParser = (options?: UrlOptions) =>
+    (value: unknown) =>
+        typeof value === 'string' && isURL(value, options) ? Result.success(value) : expected(value, 'a Url');
+
+export const urlField = <const Name extends string>(name: Name, options?: UrlOptions) => {
+    const parser = makeUrlParser(options);
+
+    return new RecordFieldBuilder(
+        name,
+        parser,
+        parser,
+        value => value,
+        false,
+    );
+};
+
+// Phone
+export type PhoneFormatter = (phone: { area: string, start: string, end: string; }) => string;
+
+const defaultPhoneFormat: PhoneFormatter = ({ area, start, end }) => `(${area}) ${start}-${end}`;
+
+const getPhoneNumber = (text: string, format: PhoneFormatter = defaultPhoneFormat): string | undefined => {
+    const [result, area, start, end] =
+        text.match(/^ *\((\d{3})\) *(\d{3}) *-? *(\d{4}) *$/) ||
+        text.match(/^ *(\d{3}) *[ .-]? *(\d{3}) *[.-]? *(\d{4}) *$/) ||
+        [];
+
+    if (result)
+        return format({ area, start, end });
+};
+
+const phoneParser = (format?: PhoneFormatter) => (value: unknown) => {
+    const error = 'a phone number';
+
+    if (typeof value !== 'string')
+        return expected(value, error);
+
+    const phone = getPhoneNumber(value, format);
+
+    return phone ? Result.success(phone) : expected(value, error);
+};
+
+export const phoneField = <const Name extends string>(name: Name, format?: PhoneFormatter) => {
+    const parser = phoneParser(format);
+
+    return new RecordFieldBuilder(name, parser, parser, value => value, false);
+};
+
+
 
 /* Temporal Fields */
 const encodeTemporal = (
@@ -173,7 +393,7 @@ const parseTemporal = (value: unknown, kind: RecordTemporalKind, defaultZone: st
 export function jsdateField<const Name extends string>(name: Name, kind: Exclude<RecordTemporalKind, 'zonedatetime'>): RecordFieldBuilder<Name, Date>;
 export function jsdateField<const Name extends string>(name: Name, kind: 'zonedatetime', zone: string): RecordFieldBuilder<Name, Date>;
 export function jsdateField<const Name extends string>(name: Name, kind: RecordTemporalKind, zone?: string): RecordFieldBuilder<Name, Date> {
-    const storedKind = kind === 'zonedatetime' ? 'datetime' : kind;
+    const storedkind = kind === 'zonedatetime' ? 'datetime' : kind;
 
     return new RecordFieldBuilder<Name, Date>(
         name,
@@ -181,11 +401,11 @@ export function jsdateField<const Name extends string>(name: Name, kind: RecordT
             ? Result.success(value)
             : expected(value, 'a date'),
         value => {
-            const parsed = parseTemporal(value, storedKind, zone ?? 'local');
+            const parsed = parseTemporal(value, storedkind, zone ?? 'local');
 
             return parsed
                 ? Result.success(parsed.toJSDate())
-                : expected(value, `a ${storedKind}`);
+                : expected(value, `a ${storedkind}`);
         },
         value => {
             if (value == null)
@@ -195,7 +415,7 @@ export function jsdateField<const Name extends string>(name: Name, kind: RecordT
             const dt = DateTime.fromJSDate(value, { zone: zone ?? 'local' });
 
             return encodeTemporal(
-                kind,
+                storedkind,
                 {
                     year: dt.year,
                     month: dt.month,
@@ -264,156 +484,4 @@ export function datetimeField<const Name extends string>(name: Name, kind: Recor
         false
     );
 }
-
-/* Specialized Number Fields */
-export const currencyField = <const Name extends string>(name: Name) =>
-    new RecordFieldBuilder(
-        name,
-        value => typeof value === 'number' && Number.isFinite(value)
-            ? Result.success(value)
-            : expected(value, 'a number'),
-        value => {
-            if (typeof value !== 'string')
-                return expected(value, 'a currency amount');
-
-            const text = value.trim();
-
-            // Allow an optional sign before the dollar symbol, never after it.
-            const match = /^([+-]?)\$([\d.,]+)$/.exec(text);
-
-            const result = parseNumber(match ? `${match[1]}${match[2]}` : text);
-
-            return result.success
-                ? result
-                : expected(value, 'a currency amount');
-        },
-        value => value,
-        false,
-    );
-
-export const percentField = <const Name extends string>(name: Name) =>
-    new RecordFieldBuilder(
-        name,
-        value => typeof value === 'number' && Number.isFinite(value)
-            ? Result.success(value)
-            : expected(value, 'a number'),
-        value => {
-            if (typeof value !== 'string')
-                return expected(value, 'a percentage');
-
-            const text = value.trim();
-
-            // Only allow a percent sign immediately after the number.
-            const match = /^([+-]?[\d.,]+)%$/.exec(text);
-
-            const result = parseNumber(match ? match[1] : text);
-
-            return result.success
-                ? Result.success(result.value / (match ? 100 : 1))
-                : expected(value, 'a percentage');
-        },
-        value => value,
-        false,
-    );
-
-
-/* Specialized String Fields */
-
-// Enum
-const enumParser = <const Enum extends readonly string[]>(values: Enum, caseSensitive: boolean) => {
-    const choices: readonly Enum[number][] = values;
-
-    const find = caseSensitive
-        ? (value: string) => choices.find(item => item === value)
-        : (value: string) => choices.find(item => item.toLowerCase() === value.toLowerCase());
-
-    return (value: unknown) => {
-        if (typeof value !== 'string')
-            return expected(value, ...values);
-
-        const match = find(value);
-
-        return match !== undefined
-            ? Result.success(match)
-            : expected(value, ...values);
-    };
-};
-
-export const enumField = <const Name extends string, const Enum extends readonly string[]>(name: Name, values: Enum, caseSensitive: boolean = false) => {
-    const parser = enumParser(values, caseSensitive);
-
-    return new RecordFieldBuilder(name, parser, parser, value => value, false);
-};
-
-
-// Email
-export type EmailOptions = IsEmailOptions;
-
-const makeEmailParser = (options?: EmailOptions) =>
-    (value: unknown) =>
-        typeof value === 'string' && isEmail(value, options) ? Result.success(value) : expected(value, 'an email address');
-
-export const emailField = <const Name extends string>(name: Name, options?: EmailOptions) => {
-    const parser = makeEmailParser(options);
-
-    return new RecordFieldBuilder(
-        name,
-        parser,
-        parser,
-        value => value,
-        false,
-    );
-};
-
-// Url
-export type UrlOptions = IsURLOptions;
-
-const makeUrlParser = (options?: UrlOptions) =>
-    (value: unknown) =>
-        typeof value === 'string' && isURL(value, options) ? Result.success(value) : expected(value, 'a Url');
-
-export const urlField = <const Name extends string>(name: Name, options?: UrlOptions) => {
-    const parser = makeUrlParser(options);
-
-    return new RecordFieldBuilder(
-        name,
-        parser,
-        parser,
-        value => value,
-        false,
-    );
-};
-
-
-// Phone
-export type PhoneFormatter = (phone: { area: string, start: string, end: string; }) => string;
-
-const defaultPhoneFormat: PhoneFormatter = ({ area, start, end }) => `(${area}) ${start}-${end}`;
-
-const getPhoneNumber = (text: string, format: PhoneFormatter = defaultPhoneFormat): string | undefined => {
-    const [result, area, start, end] =
-        text.match(/^ *\((\d{3})\) *(\d{3}) *-? *(\d{4}) *$/) ||
-        text.match(/^ *(\d{3}) *[ .-]? *(\d{3}) *[.-]? *(\d{4}) *$/) ||
-        [];
-
-    if (result)
-        return format({ area, start, end });
-};
-
-const phoneParser = (format?: PhoneFormatter) => (value: unknown) => {
-    if (typeof value !== 'string')
-        return expected(value, 'a phone number');
-
-    const phone = getPhoneNumber(value, format);
-
-    return phone
-        ? Result.success(phone)
-        : expected(value, 'a phone number');
-};
-
-export const phoneField = <const Name extends string>(name: Name, format?: PhoneFormatter) => {
-    const parser = phoneParser(format);
-
-    return new RecordFieldBuilder(name, parser, parser, value => value, false);
-};
 

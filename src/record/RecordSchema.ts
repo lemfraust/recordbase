@@ -22,7 +22,7 @@ export const isRecordTemporal = (value: RecordValue): value is RecordTemporalVal
 /* Processor */
 export type RecordValidator<Type> = (value: unknown) => Result<Type, string>;
 
-export type RecordParser<Type> = (value: string) => Result<Type, string>;
+export type RecordParser<Type> = (value: RecordValue) => Result<Type, string>;
 
 export type RecordEncoder<Type> = (value: Type | null | undefined) => RecordValue;
 

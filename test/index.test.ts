@@ -1,5 +1,6 @@
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import { rb, RecordBook } from '../src';
+import { DateTime } from 'luxon';
 
 const Phone = rb.string('Phone');
 const Email = rb.string('Email').optional();
@@ -85,7 +86,7 @@ describe('fields', () => {
 
     it('supports custom parsers and encoders', () => {
         const Tagged = rb.string('Tag')
-            .parser(value => ({ success: true, value: value.toUpperCase() }))
+            .parser(value => ({ success: true, value: value?.toString().toUpperCase() ?? '' }))
             .encoder(value => value?.toLowerCase() ?? null);
 
         expect(Tagged.parse('abc')).toEqual({ success: true, value: 'ABC' });
@@ -297,5 +298,117 @@ describe('type inference (run tsc --noEmit too)', () => {
 
             void [missingPhone, wrongStatus, missingRef, wrongRef, invalidTable];
         }
+    });
+
+
+    describe('temporal fields', () => {
+        const date = { year: 2026, month: 10, day: 19 };
+        const time = { hour: 9, minute: 30, second: 45, millisecond: 123 };
+
+        it('encodes all four temporal kinds', () => {
+            const value = DateTime.fromObject(
+                { ...date, ...time },
+                { zone: 'America/New_York' }
+            );
+
+            expect(rb.datetime('D', 'date').encode(value))
+                .toEqual({ kind: 'date', date });
+
+            expect(rb.datetime('T', 'time').encode(value))
+                .toEqual({ kind: 'time', time });
+
+            expect(rb.datetime('DT', 'datetime').encode(value))
+                .toEqual({ kind: 'datetime', date, time });
+
+            expect(rb.datetime('ZDT', 'zonedatetime').encode(value))
+                .toEqual({ kind: 'zonedatetime', date, time, zone: 'America/New_York' });
+        });
+
+        it('converts a fixed-zone Luxon field to a timezone-free stored datetime', () => {
+            const field = rb.datetime('Eastern', 'zonedatetime', 'America/New_York');
+            const input = DateTime.fromISO('2026-10-19T13:30:45.123Z');
+
+            const encoded = field.encode(input);
+
+            expect(encoded).toEqual({ kind: 'datetime', date, time });
+
+            const parsed = field.parse(encoded);
+            expect(parsed.success).toBe(true);
+
+            if (parsed.success) {
+                expect(parsed.value.toMillis()).toBe(input.toMillis());
+                expect(parsed.value.zoneName).toBe('America/New_York');
+            }
+        });
+
+        it('preserves a variable-zone Luxon datetime', () => {
+            const field = rb.datetime('Original', 'zonedatetime');
+            const input = DateTime.fromISO(
+                '2026-10-19T09:30:45.123',
+                { zone: 'America/New_York' }
+            );
+
+            const encoded = field.encode(input);
+
+            expect(encoded).toEqual({
+                kind: 'zonedatetime',
+                date,
+                time,
+                zone: 'America/New_York'
+            });
+
+            const parsed = field.parse(encoded);
+            expect(parsed.success).toBe(true);
+
+            if (parsed.success) {
+                expect(parsed.value.toMillis()).toBe(input.toMillis());
+                expect(parsed.value.zoneName).toBe('America/New_York');
+            }
+        });
+
+        it('preserves numeric UTC offsets', () => {
+            const field = rb.datetime('Offset', 'zonedatetime');
+            const input = DateTime.fromISO(
+                '2026-10-19T09:30:45.123-04:00',
+                { setZone: true }
+            );
+
+            const encoded = field.encode(input);
+
+            expect(encoded).toEqual({
+                kind: 'zonedatetime',
+                date,
+                time,
+                zone: '-04:00'
+            });
+
+            const parsed = field.parse(encoded);
+            expect(parsed.success).toBe(true);
+
+            if (parsed.success)
+                expect(parsed.value.toMillis()).toBe(input.toMillis());
+        });
+
+        it('converts a JS Date using the configured zone', () => {
+            const field = rb.jsdate('Eastern', 'zonedatetime', 'America/New_York');
+            const input = new Date('2026-10-19T13:30:45.123Z');
+
+            const encoded = field.encode(input);
+
+            expect(encoded).toEqual({ kind: 'datetime', date, time });
+
+            const parsed = field.parse(encoded);
+            expect(parsed.success).toBe(true);
+
+            if (parsed.success)
+                expect(parsed.value.getTime()).toBe(input.getTime());
+        });
+
+        it('preserves null and undefined during encoding', () => {
+            const field = rb.datetime('Optional', 'zonedatetime');
+
+            expect(field.encode(null)).toBeNull();
+            expect(field.encode(undefined)).toBeUndefined();
+        });
     });
 });
