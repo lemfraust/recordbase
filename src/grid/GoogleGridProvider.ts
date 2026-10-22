@@ -15,7 +15,6 @@ type GoogleCellValue = sheets_v4.Schema$ExtendedValue;
 type GoogleWriteRequest = sheets_v4.Schema$Request;
 
 
-
 /* Google Helpers */
 export type GoogleApiCredentials = { email: string, key: string; };
 
@@ -137,6 +136,7 @@ const toGoogleWriteRequest = (sheetIds: ReadonlyMap<string, number>, block: Grid
 export type GoogleGridProviderOptions = {
     id: string;
     api: GoogleApiSource;
+    formatted?: boolean;
     handlers?: ExecutorHandler | GoogleGridProviderHandlerOptions;
 };
 
@@ -243,6 +243,7 @@ export class GoogleGridProvider implements GridProvider {
     readonly #id: string;
     readonly #api: Lazy<GoogleApi>;
     readonly #handlers: GoogleGridProviderHandlers;
+    readonly #formatted: boolean;
 
     #sheetIds?: Lazy<Map<string, number>>;
 
@@ -259,6 +260,8 @@ export class GoogleGridProvider implements GridProvider {
         );
 
         this.#handlers = resolveHandlers(options.handlers);
+
+        this.#formatted = options.formatted ?? true;
     }
 
     async read(ranges: readonly GridRange[]): Promise<GridReadBlock[]> {
@@ -273,7 +276,11 @@ export class GoogleGridProvider implements GridProvider {
         const response = await execute(() => api.spreadsheets.values.batchGet({
             spreadsheetId: this.#id,
             ranges: a1Ranges,
-            majorDimension: "ROWS",                        
+            majorDimension: "ROWS",
+            valueRenderOption: this.#formatted
+                ? 'FORMATTED_VALUE'
+                : 'UNFORMATTED_VALUE',
+            dateTimeRenderOption: 'SERIAL_NUMBER'
         }), this.#handlers.read);
 
         // translate results into GridReadBlocks
