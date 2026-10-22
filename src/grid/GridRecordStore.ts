@@ -86,7 +86,6 @@ export class GridRecordStore<const Tables extends readonly RecordTable<any, Reco
         this.tables = freeze(tables) as unknown as Tables;
     }
 
-
     // Read
     #locate(table: RecordTable, refs?: readonly RecordRef[]): GridRange[] {
         const { name, offset } = this.#options.get(table)!;
@@ -100,7 +99,7 @@ export class GridRecordStore<const Tables extends readonly RecordTable<any, Reco
             return coalesce(refs).map(span => GridAddress.range(name, 0, offset + span.from, width, span.length));
     }
 
-    #parseRow<Table extends Tables[number]>(table: Table, row: readonly string[], ref: number): RecordTableEntry<Table> {
+    #parseRow<Table extends Tables[number]>(table: Table, row: readonly RecordValue[], ref: number): RecordTableEntry<Table> {
         const entry: Record<string, any> = { $ref: ref };
 
         let index = 0;

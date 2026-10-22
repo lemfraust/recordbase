@@ -3,7 +3,7 @@ import { GridCoordinate } from "./GridAddress";
 
 export type GridBlock<T> = { grid: string; start: GridCoordinate | undefined, rows: T[][]; };
 
-export type GridReadBlock = GridBlock<string>;
+export type GridReadBlock = GridBlock<RecordValue>;
 
 export type GridWriteBlock = GridBlock<RecordValue>;
 

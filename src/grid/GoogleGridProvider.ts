@@ -273,8 +273,7 @@ export class GoogleGridProvider implements GridProvider {
         const response = await execute(() => api.spreadsheets.values.batchGet({
             spreadsheetId: this.#id,
             ranges: a1Ranges,
-            majorDimension: "ROWS",
-            valueRenderOption: "FORMATTED_VALUE"
+            majorDimension: "ROWS",                        
         }), this.#handlers.read);
 
         // translate results into GridReadBlocks
@@ -283,7 +282,7 @@ export class GoogleGridProvider implements GridProvider {
         return ranges.map((range, index) => ({
             grid: range.grid,
             start: range.from,
-            rows: (values[index]?.values ?? []) as string[][]
+            rows: (values[index]?.values ?? []) as RecordValue[][]
         }));
     }
 
