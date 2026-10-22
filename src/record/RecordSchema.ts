@@ -2,12 +2,27 @@ import { RecordData, RecordEntry, RecordGroupData, RecordGroupPartial, RecordPat
 import { freeze, Result } from "../util";
 
 /* Value */
-export type RecordValue = string | number | boolean | Date | { formula: string; } | null | undefined;
+export type RecordDate = { year: number; month: number; day: number; };
+
+export type RecordTime = { hour: number; minute?: number; second?: number; millisecond?: number; };
+
+export type RecordTemporalValue =
+    | { kind: 'date'; date: RecordDate; }
+    | { kind: 'time'; time: RecordTime; }
+    | { kind: 'datetime'; date: RecordDate; time: RecordTime; }
+    | { kind: 'zonedatetime'; date: RecordDate; time: RecordTime; zone: string; };
+
+export type RecordTemporalKind = RecordTemporalValue['kind'];
+
+export type RecordValue = string | number | boolean | RecordTemporalValue | null | undefined;
+
+export const isRecordTemporal = (value: RecordValue): value is RecordTemporalValue =>
+    value !== null && typeof value === 'object' && 'kind' in value;
 
 /* Processor */
 export type RecordValidator<Type> = (value: unknown) => Result<Type, string>;
 
-export type RecordParser<Type> = (value: string) => Result<Type, string>;
+export type RecordParser<Type> = (value: RecordValue) => Result<Type, string>;
 
 export type RecordEncoder<Type> = (value: Type | null | undefined) => RecordValue;
 
@@ -44,7 +59,7 @@ export interface RecordGroupDefinition<Fields extends RecordField<any, any, any>
     readonly type: RecordGroupData<Fields>;
     readonly patch: RecordGroupPartial<Fields>;
 
-    validate(value: unknown): Result<RecordGroupData<Fields>, string>;
+    validate(value: unknown): Result<RecordGroupData<Fields>, RecordValidationIssue[]>;
 }
 
 export type RecordElement = RecordField | RecordGroup;
@@ -61,69 +76,85 @@ export type RecordSchema = RecordElement[];
 
 
 // Validation
-export function validateSchema<Schema extends RecordSchema>(schema: Schema, input: unknown): Result<RecordData<Schema>, string>;
-export function validateSchema<Schema extends RecordSchema>(schema: Schema, input: unknown, allowRef: true): Result<RecordType<Schema>, string>;
+export type RecordValidationIssue = {
+    field: string;
+    issue: string;
+};
+
+export function validateSchema<Schema extends RecordSchema>(schema: Schema, input: unknown)
+    : Result<RecordData<Schema>, RecordValidationIssue[]>;
+
+export function validateSchema<Schema extends RecordSchema>(schema: Schema, input: unknown, allowRef: true)
+    : Result<RecordType<Schema>, RecordValidationIssue[]>;
+
 export function validateSchema<Schema extends RecordSchema>(schema: Schema, input: unknown, allowRef = false)
-    : Result<RecordData<Schema> | RecordType<Schema>, string> {
+    : Result<RecordData<Schema> | RecordType<Schema>, RecordValidationIssue[]> {
 
     if (input === null || typeof input !== 'object' || Array.isArray(input))
-        return Result.failure('Expected an object');
-
+        return Result.failure([{ field: '', issue: 'Expected an object' }]);
 
     const record = input as Record<string, unknown>;
     const output: Record<string, unknown> = {};
+    const issues: RecordValidationIssue[] = [];
 
     const allowed = new Set<string>(schema.map(item => item.name));
 
     if (allowRef)
         allowed.add('$ref');
 
-    // Reject unknown properties
+    // Unknown fields
     for (const name of Object.keys(record)) {
         if (!allowed.has(name))
-            return Result.failure(`Unknown field: ${name}`);
+            issues.push({ field: name, issue: 'Unknown field' });
     }
 
+    // Schema fields
     for (const item of schema) {
         const value = record[item.name];
 
-        // Required and optional fields
         if (value === null || value === undefined) {
             if (!item.isOptional)
-                return Result.failure(`${item.name}: required`);
-
-            if (value === null)
+                issues.push({ field: item.name, issue: 'required' });
+            else if (value === null)
                 output[item.name] = null;
 
             continue;
         }
 
-        // Groups are validated recursively
-        const result = 'fields' in item
-            ? validateSchema(item.fields, value)
-            : item.validate(value);
+        if (RecordElement.isGroup(item)) {
+            const result = validateSchema(item.fields, value);
 
-        if (!result.success)
-            return Result.failure(`${item.name}: ${result.info}`);
+            if (!result.success) {
+                issues.push(...result.info.map(({ field, issue }) => ({
+                    field: field ? `${item.name}.${field}` : item.name,
+                    issue
+                })));
+            }
+            else
+                output[item.name] = result.value;
+        }
+        else {
+            const result = item.validate(value);
 
-        output[item.name] = result.value;
+            if (!result.success)
+                issues.push({ field: item.name, issue: result.info });
+            else
+                output[item.name] = result.value;
+        }
     }
 
     // Optional table reference
     if (allowRef && record.$ref !== undefined) {
-        if (
-            typeof record.$ref !== 'string' &&
-            typeof record.$ref !== 'number'
-        ) {
-            return Result.failure(
-                '$ref: expected a string or number'
-            );
-        }
-
-        output.$ref = record.$ref;
+        if (typeof record.$ref !== 'string' &&
+            typeof record.$ref !== 'number')
+            issues.push({ field: '$ref', issue: 'Expected a string or number' });
+        else
+            output.$ref = record.$ref;
     }
 
-    return Result.success(output as RecordType<Schema>);
+    return issues.length
+        ? Result.failure(issues)
+        : Result.success(output as RecordType<Schema>);
 }
 
 /* Builders */
@@ -228,7 +259,7 @@ export class RecordGroupBuilder<
         return new RecordGroupBuilder<NewName, Fields, Optional>(name, this.fields, this.isOptional);
     }
 
-    validate(value: unknown): Result<RecordGroupData<Fields>, string> {
+    validate(value: unknown): Result<RecordGroupData<Fields>, RecordValidationIssue[]> {
         return validateSchema(this.fields, value);
     }
 
@@ -273,7 +304,7 @@ export class RecordTable<
         return new RecordTable(name, this.schema);
     }
 
-    validate(value: unknown): Result<RecordType<Schema>, string> {
+    validate(value: unknown): Result<RecordType<Schema>, RecordValidationIssue[]> {
         return validateSchema(this.schema, value, true);
     }
 

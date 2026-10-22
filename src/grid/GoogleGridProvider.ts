@@ -2,8 +2,9 @@ import { auth, sheets, sheets_v4 } from "@googleapis/sheets";
 
 import { execute, ExecutorHandler, lazy, Lazy, Resolvable, retryHandler } from "../util";
 import { GridAddress, GridCoordinate, GridRange } from "./GridAddress";
-import { GridBlock, GridReadBlock, GridWriteBlock, GridValue } from "./GridBlock";
+import { GridBlock, GridReadBlock, GridWriteBlock } from "./GridBlock";
 import { GridProvider, GridWriteRequest, GridWriteResults } from "./GridProvider";
+import { isRecordTemporal, RecordTemporalValue, RecordValue } from "../record";
 
 
 /* Google Types */
@@ -12,7 +13,6 @@ export type GoogleApi = sheets_v4.Sheets;
 type GoogleCellValue = sheets_v4.Schema$ExtendedValue;
 
 type GoogleWriteRequest = sheets_v4.Schema$Request;
-
 
 
 /* Google Helpers */
@@ -38,46 +38,65 @@ const createGoogleApi = async ({ email, key }: GoogleApiCredentials): Promise<Go
 
 const encodeGridName = (name: string): string => `'${name.replaceAll("'", "''")}'`;
 
-const dateToSerialNumber = (date: Date): number => {
-    const epoch = new Date(1899, 11, 30);
-    return (date.getTime() - epoch.getTime()) / 86400000;
+const DAY = 86400000;
+const EPOCH = Date.UTC(1899, 11, 30);
+
+const temporalToSerial = (value: RecordTemporalValue): number => {
+    const date = 'date' in value
+        ? (Date.UTC(
+            value.date.year,
+            value.date.month - 1,
+            value.date.day
+        ) - EPOCH) / DAY
+        : 0;
+
+    const time = 'time' in value
+        ? (
+            value.time.hour * 3600000 +
+            (value.time.minute ?? 0) * 60000 +
+            (value.time.second ?? 0) * 1000 +
+            (value.time.millisecond ?? 0)
+        ) / DAY
+        : 0;
+
+    return date + time;
 };
 
-const toGoogleCellValue = (value: GridValue): GoogleCellValue | undefined => {
+const pad = (value: number, length = 2) => String(value).padStart(length, '0');
+
+const temporalToGoogleValue = (value: RecordTemporalValue): number | string => {
+    if (value.kind !== 'zonedatetime')
+        return temporalToSerial(value);
+
+    const { date, time, zone } = value;
+
+    return `${pad(date.year, 4)}-${pad(date.month)}-${pad(date.day)}T` +
+        `${pad(time.hour)}:${pad(time.minute ?? 0)}:` +
+        `${pad(time.second ?? 0)}.${pad(time.millisecond ?? 0, 3)}[${zone}]`;
+};
+
+const toGoogleCellValue = (value: RecordValue): GoogleCellValue | undefined => {
     if (typeof value === 'string')
         return { stringValue: value };
     else if (typeof value === 'number')
         return { numberValue: value };
     else if (typeof value === 'boolean')
         return { boolValue: value };
-    else if (value instanceof Date)
-        return { numberValue: dateToSerialNumber(value) };
+    else if (isRecordTemporal(value))
+        return toGoogleCellValue(temporalToGoogleValue(value));
     else if (value === null)
         return { stringValue: '' };
-    else if (value === undefined)
-        return undefined;
-    else
-        return { formulaValue: value.formula.startsWith('=') ? value.formula : `=${value.formula}` };
 };
 
-const toGoogleAppendValue = (value: GridValue): string | number | boolean | null => {
-    if (value === undefined)
+const toGoogleAppendValue = (value: RecordValue): string | number | boolean | null => {
+    if (typeof value === 'string')
+        return value ? `'${value}` : '';
+    else if (value === undefined)
         return null;
-
+    else if (isRecordTemporal(value))
+        return toGoogleAppendValue(temporalToGoogleValue(value));
     else if (value === null)
         return '';
-
-    else if (value instanceof Date)
-        return dateToSerialNumber(value);
-
-    else if (typeof value === 'string')
-        return value ? `'${value}` : '';
-
-    else if (typeof value === 'object')
-        return value.formula.startsWith('=')
-            ? value.formula
-            : `=${value.formula}`;
-
     else
         return value;
 };
@@ -117,6 +136,7 @@ const toGoogleWriteRequest = (sheetIds: ReadonlyMap<string, number>, block: Grid
 export type GoogleGridProviderOptions = {
     id: string;
     api: GoogleApiSource;
+    formatted?: boolean;
     handlers?: ExecutorHandler | GoogleGridProviderHandlerOptions;
 };
 
@@ -223,6 +243,7 @@ export class GoogleGridProvider implements GridProvider {
     readonly #id: string;
     readonly #api: Lazy<GoogleApi>;
     readonly #handlers: GoogleGridProviderHandlers;
+    readonly #formatted: boolean;
 
     #sheetIds?: Lazy<Map<string, number>>;
 
@@ -239,6 +260,8 @@ export class GoogleGridProvider implements GridProvider {
         );
 
         this.#handlers = resolveHandlers(options.handlers);
+
+        this.#formatted = options.formatted ?? true;
     }
 
     async read(ranges: readonly GridRange[]): Promise<GridReadBlock[]> {
@@ -254,7 +277,10 @@ export class GoogleGridProvider implements GridProvider {
             spreadsheetId: this.#id,
             ranges: a1Ranges,
             majorDimension: "ROWS",
-            valueRenderOption: "FORMATTED_VALUE"
+            valueRenderOption: this.#formatted
+                ? 'FORMATTED_VALUE'
+                : 'UNFORMATTED_VALUE',
+            dateTimeRenderOption: 'SERIAL_NUMBER'
         }), this.#handlers.read);
 
         // translate results into GridReadBlocks
@@ -263,7 +289,7 @@ export class GoogleGridProvider implements GridProvider {
         return ranges.map((range, index) => ({
             grid: range.grid,
             start: range.from,
-            rows: (values[index]?.values ?? []) as string[][]
+            rows: (values[index]?.values ?? []) as RecordValue[][]
         }));
     }
 
